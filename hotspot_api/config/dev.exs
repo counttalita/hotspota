@@ -65,3 +65,15 @@ config :phoenix, :plug_init_mode, :runtime
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+
+# Twilio configuration (optional in dev - will log OTP instead)
+config :hotspot_api,
+  twilio_account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
+  twilio_auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
+  twilio_phone_number: System.get_env("TWILIO_PHONE_NUMBER")
+
+# Guardian configuration
+config :hotspot_api, HotspotApi.Guardian,
+  issuer: "hotspot_api",
+  secret_key: "dev_secret_key_replace_in_production_with_mix_phx_gen_secret"

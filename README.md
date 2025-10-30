@@ -38,7 +38,7 @@ This monorepo contains three main applications:
 
 ```
 HotSpota/
-├── hotspot_api/          # Backend API (Node.js + Express + PostgreSQL)
+├── hotspot_api/          # Backend API (Phoenix/Elixir + PostgreSQL)
 ├── hotspot_mobile/       # Mobile App (React Native + Expo)
 ├── hotspot_admin/        # Admin Portal (React + Vite) - Coming soon
 └── .kiro/specs/          # Technical specifications
@@ -48,7 +48,7 @@ HotSpota/
 
 | Application | Technology | Purpose |
 |------------|-----------|---------|
-| **Backend API** | Node.js, Express, PostgreSQL+PostGIS | REST API, WebSocket server, geospatial processing |
+| **Backend API** | Phoenix (Elixir), PostgreSQL+PostGIS | REST API, Phoenix Channels (WebSocket), geospatial processing |
 | **Mobile App** | React Native, Expo, MapLibre | iOS & Android app for end users |
 | **Admin Portal** | React, Vite, TailwindCSS | Web dashboard for moderation and analytics |
 
@@ -56,7 +56,8 @@ HotSpota/
 
 ### Prerequisites
 
-- Node.js 20.x or higher
+- Elixir 1.15+ and Erlang/OTP 26+ (for backend)
+- Node.js 20.x or higher (for mobile app and admin portal)
 - PostgreSQL 16 with PostGIS extension
 - Redis 7.x
 - iOS Simulator (Mac) or Android Studio
@@ -73,11 +74,11 @@ HotSpota/
 2. **Set up the backend**
    ```bash
    cd hotspot_api
-   npm install
+   mix setup
    cp .env.example .env
    # Edit .env with your database credentials
-   npm run db:migrate
-   npm run dev
+   mix ecto.setup
+   mix phx.server
    ```
 
 3. **Set up the mobile app**
@@ -112,11 +113,12 @@ All core technologies use permissive open-source licenses (MIT, BSD, Apache-2.0)
 - React Query - Server state and caching
 
 **Backend**
-- Node.js + Express.js - REST API server
-- Socket.IO - Real-time bidirectional communication
+- Phoenix Framework (Elixir) - REST API and real-time server
+- Phoenix Channels - WebSocket communication
 - PostgreSQL + PostGIS - Spatial database
-- Redis - Caching and session management
-- Auth.js - Authentication
+- Ecto - Database ORM
+- Guardian - JWT authentication
+- Oban - Background job processing
 
 **Admin Portal**
 - React + Vite - Fast web development
@@ -229,22 +231,22 @@ White-label dashboards for:
 ```bash
 # Backend tests
 cd hotspot_api
-npm test
+mix test
 
 # Mobile app tests
 cd hotspot_mobile
 npm test
 
-# E2E tests
+# E2E tests (mobile)
 npm run test:e2e
 ```
 
 ## 🚢 Deployment
 
 ### Backend
-- Production: Render/Railway
-- Database: PostgreSQL with PostGIS on Render
-- Redis: Upstash or Render Redis
+- Production: Fly.io or Gigalixir (Phoenix-optimized)
+- Database: PostgreSQL with PostGIS on Fly.io
+- Alternative: Render (with Elixir buildpack)
 
 ### Mobile App
 - iOS: App Store via Expo EAS Build
@@ -271,6 +273,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
+- Phoenix Framework and Elixir community
 - MapLibre for open-source mapping
 - PostGIS for geospatial capabilities
 - The React Native and Expo communities
@@ -288,6 +291,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Stay alert. Travel smart.**
 
-Made with ❤️ in South Africa
+Made with ❤️ by TOSH
 
 </div>

@@ -3,10 +3,26 @@ defmodule HotspotApiWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug CORSPlug
+  end
+
+  pipeline :auth do
+    plug HotspotApiWeb.Auth.Pipeline
   end
 
   scope "/api", HotspotApiWeb do
     pipe_through :api
+
+    # Public auth endpoints
+    post "/auth/send-otp", AuthController, :send_otp
+    post "/auth/verify-otp", AuthController, :verify_otp
+  end
+
+  scope "/api", HotspotApiWeb do
+    pipe_through [:api, :auth]
+
+    # Protected endpoints
+    get "/auth/me", AuthController, :me
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
