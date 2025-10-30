@@ -50,6 +50,11 @@ if config_env() == :prod do
     issuer: "hotspot_api",
     secret_key: System.get_env("GUARDIAN_SECRET_KEY")
 
+  # FCM configuration
+  config :hotspot_api,
+    fcm_server_key: System.get_env("FCM_SERVER_KEY"),
+    apns_mode: :prod
+
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
   # want to use a different value for prod and you most likely don't want

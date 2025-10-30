@@ -13,15 +13,39 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#EF4444",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Hotspot Alert"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#EF4444",
+          "sounds": ["./assets/notification-sound.wav"]
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }

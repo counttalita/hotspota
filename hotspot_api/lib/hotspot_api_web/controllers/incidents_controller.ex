@@ -45,6 +45,11 @@ defmodule HotspotApiWeb.IncidentsController do
 
     case Incidents.create_incident(incident_params) do
       {:ok, %Incident{} = incident} ->
+        # Send notifications to nearby users asynchronously
+        Task.start(fn ->
+          HotspotApi.Notifications.send_incident_alert(incident.id, incident.location)
+        end)
+
         conn
         |> put_status(:created)
         |> render(:show, incident: incident)

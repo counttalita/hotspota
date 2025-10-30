@@ -81,3 +81,8 @@ config :hotspot_api, HotspotApi.Guardian,
 # Hammer rate limiting configuration
 config :hammer,
   backend: {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]}
+
+# FCM configuration (optional in dev - will log notifications instead)
+config :hotspot_api,
+  fcm_server_key: System.get_env("FCM_SERVER_KEY"),
+  apns_mode: :dev

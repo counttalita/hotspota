@@ -68,7 +68,9 @@ defmodule HotspotApi.MixProject do
       # Rate limiting
       {:hammer, "~> 6.2"},
       # Geohash for location-based channels
-      {:geohash, "~> 1.3"}
+      {:geohash, "~> 1.3"},
+      # Push notifications
+      {:pigeon, "~> 2.0"}
     ]
   end
 

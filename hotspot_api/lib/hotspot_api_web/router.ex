@@ -36,6 +36,11 @@ defmodule HotspotApiWeb.Router do
     post "/incidents/upload-photo", IncidentsController, :upload_photo
     get "/incidents/nearby", IncidentsController, :nearby
     get "/incidents/feed", IncidentsController, :feed
+
+    # Notification endpoints
+    post "/notifications/register-token", NotificationsController, :register_token
+    get "/notifications/preferences", NotificationsController, :get_preferences
+    put "/notifications/preferences", NotificationsController, :update_preferences
   end
 
   scope "/api", HotspotApiWeb do
