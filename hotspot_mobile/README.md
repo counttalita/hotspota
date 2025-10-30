@@ -4,7 +4,7 @@ Cross-platform mobile application for iOS and Android built with React Native an
 
 ## 🏗️ Architecture
 
-- **Framework**: React Native 0.74 with Expo SDK 51
+- **Framework**: React Native 0.81 with Expo SDK 54
 - **Navigation**: React Navigation 6
 - **State Management**: Zustand
 - **Server State**: React Query (TanStack Query)
@@ -42,46 +42,34 @@ Cross-platform mobile application for iOS and Android built with React Native an
 
 ### Prerequisites
 
-- Node.js 20.x or higher
+- Node.js 18.x or higher
 - npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
 - iOS Simulator (Mac only) or Android Studio
 - Expo Go app on physical device (for testing)
 
 ### Installation
 
 1. **Install dependencies**
+
    ```bash
    cd hotspot_mobile
    npm install
    ```
 
-2. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   ```
+2. **Start the development server**
 
-   Edit `.env`:
-   ```bash
-   EXPO_PUBLIC_API_URL=http://localhost:4000/api
-   EXPO_PUBLIC_WS_URL=ws://localhost:4000/socket
-   EXPO_PUBLIC_MAPLIBRE_STYLE_URL=https://tiles.example.com/style.json
-   EXPO_PUBLIC_FCM_SENDER_ID=your_fcm_sender_id
-   ```
-
-3. **Start the development server**
    ```bash
    npx expo start
    ```
 
    Or with specific platform:
+
    ```bash
    npx expo start --ios      # iOS Simulator
    npx expo start --android  # Android Emulator
-   npx expo start --web      # Web browser
    ```
 
-4. **Run on physical device**
+3. **Run on physical device**
    - Install Expo Go from App Store / Play Store
    - Scan QR code from terminal
    - Shake device to open developer menu
@@ -90,45 +78,30 @@ Cross-platform mobile application for iOS and Android built with React Native an
 
 ```
 hotspot_mobile/
-├── app/                    # Expo Router app directory
-│   ├── (auth)/            # Authentication screens
-│   ├── (tabs)/            # Main tab navigation
-│   ├── _layout.tsx        # Root layout
-│   └── index.tsx          # Entry point
-├── components/            # Reusable components
-│   ├── map/              # Map-related components
-│   ├── incidents/        # Incident components
-│   ├── ui/               # UI primitives
-│   └── shared/           # Shared components
-├── hooks/                # Custom React hooks
-│   ├── useLocation.ts
-│   ├── useIncidents.ts
-│   ├── useGeofencing.ts
-│   └── useNotifications.ts
-├── services/             # API and external services
-│   ├── api.ts           # REST API client
-│   ├── socket.ts        # WebSocket client
-│   ├── location.ts      # Location services
-│   └── notifications.ts # Push notifications
-├── stores/              # Zustand state stores
-│   ├── authStore.ts
-│   ├── incidentStore.ts
-│   └── settingsStore.ts
-├── utils/               # Utility functions
-│   ├── geospatial.ts   # Distance calculations
-│   ├── formatting.ts   # Date/time formatting
-│   └── validation.ts   # Input validation
-├── constants/           # App constants
-│   ├── Colors.ts
-│   ├── IncidentTypes.ts
-│   └── Config.ts
-├── assets/              # Static assets
+├── src/
+│   ├── components/        # Reusable components
+│   │   ├── NotificationBanner.js
+│   │   └── ReportIncidentModal.js
+│   ├── screens/          # Screen components
+│   │   ├── PhoneAuthScreen.js
+│   │   ├── OTPVerificationScreen.js
+│   │   ├── MainScreen.js
+│   │   ├── MapScreen.js
+│   │   ├── IncidentFeedScreen.js
+│   │   └── SettingsScreen.js
+│   └── services/         # API and external services
+│       ├── authService.js
+│       ├── incidentService.js
+│       ├── notificationService.js
+│       ├── websocketService.js
+│       └── config.js
+├── assets/               # Static assets
 │   ├── images/
 │   ├── icons/
 │   └── fonts/
-├── app.json            # Expo configuration
-├── package.json        # Dependencies
-└── tailwind.config.js  # NativeWind configuration
+├── App.js               # Root component
+├── app.json             # Expo configuration
+└── package.json         # Dependencies
 ```
 
 ## 🗺️ Key Screens

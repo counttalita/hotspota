@@ -1,5 +1,7 @@
 # Hotspot Admin Portal
 
+> **Status: Planned** - This admin portal is not yet implemented but will be built as a React web application that consumes the same Hotspot API as the mobile app.
+
 Mobile-friendly web application for moderating incidents, managing users, and viewing analytics.
 
 ## 🏗️ Architecture
@@ -79,9 +81,9 @@ Mobile-friendly web application for moderating incidents, managing users, and vi
 
 ### Prerequisites
 
-- Node.js 20.x or higher
+- Node.js 18.x or higher
 - npm or yarn
-- Access to Hotspot backend API
+- Access to Hotspot backend API (same API used by mobile app)
 
 ### Installation
 

@@ -6,32 +6,29 @@ Backend REST API and WebSocket server for the Hotspot community safety reporting
 
 - **Framework**: Phoenix 1.8 (Elixir)
 - **Database**: PostgreSQL 16 with PostGIS extension
-- **Cache**: Redis 7.x
-- **Real-time**: Phoenix Channels (WebSocket)
+- **Real-time**: Phoenix Channels (WebSocket) - Planned
 - **Authentication**: Guardian (JWT tokens)
 - **OTP**: Twilio Verify API
 - **Push Notifications**: Firebase Cloud Messaging (FCM)
-- **Image Storage**: Cloudinary
-- **Background Jobs**: Oban
+- **Image Storage**: Appwrite
+- **Background Jobs**: Oban - Planned
 
 ## 📋 Features
 
-### Core Services
+### Implemented
 
-- **Authentication Service** - Phone number + OTP verification, JWT token management
-- **Incident Service** - CRUD operations for incident reports with geospatial queries
-- **Geofencing Service** - Automatic hotspot zone creation and entry/exit detection
-- **Notification Service** - Push notifications via FCM with radius-based targeting
-- **Verification Service** - Community upvoting and incident verification
-- **Analytics Service** - Hotspot statistics, time patterns, and trend analysis
-- **Monetization Service** - Partner sponsorships and enterprise API access
+- ✅ **Authentication Service** - Phone number + OTP verification, JWT token management
+- ✅ **Incident Service** - Create and query incident reports with geospatial queries (PostGIS)
+- ✅ **Notification Service** - Push notifications via FCM with radius-based targeting
+- ✅ **Image Upload** - Photo upload via Appwrite storage
 
-### Real-Time Features
+### Planned
 
-- WebSocket connections via Phoenix Channels
-- Live incident updates broadcast to nearby users
-- Hotspot zone entry/exit alerts
-- Geohash-based room subscriptions for efficient broadcasting
+- 🔜 **Geofencing Service** - Automatic hotspot zone creation and entry/exit detection
+- 🔜 **Verification Service** - Community upvoting and incident verification
+- 🔜 **Analytics Service** - Hotspot statistics, time patterns, and trend analysis
+- 🔜 **Real-Time Features** - WebSocket connections via Phoenix Channels
+- 🔜 **Monetization Service** - Partner sponsorships and enterprise API access
 
 ## 🚀 Getting Started
 
@@ -39,36 +36,38 @@ Backend REST API and WebSocket server for the Hotspot community safety reporting
 
 - Elixir 1.15+ and Erlang/OTP 26+
 - PostgreSQL 16 with PostGIS extension
-- Redis 7.x
 - Twilio account (for OTP)
 - Firebase project (for push notifications)
-- Cloudinary account (for image uploads)
+- Appwrite account (for image uploads)
 
 ### Installation
 
 1. **Install dependencies**
+
    ```bash
-   mix setup
+   mix deps.get
    ```
 
 2. **Configure environment variables**
+
    ```bash
    cp .env.example .env
    ```
 
    Edit `.env` with your credentials:
+
    ```bash
-   DATABASE_URL=postgres://user:pass@localhost/hotspot_dev
-   REDIS_URL=redis://localhost:6379
+   DATABASE_URL=ecto://postgres:postgres@localhost/hotspot_api_dev
    SECRET_KEY_BASE=your_secret_key
    TWILIO_ACCOUNT_SID=your_twilio_sid
    TWILIO_AUTH_TOKEN=your_twilio_token
-   TWILIO_VERIFY_SERVICE_SID=your_verify_service_sid
+   TWILIO_PHONE_NUMBER=your_twilio_phone
    FCM_SERVER_KEY=your_fcm_server_key
-   CLOUDINARY_URL=cloudinary://key:secret@cloud_name
+   GUARDIAN_SECRET_KEY=your_guardian_secret
    ```
 
 3. **Set up the database**
+
    ```bash
    mix ecto.setup
    ```
@@ -80,11 +79,13 @@ Backend REST API and WebSocket server for the Hotspot community safety reporting
    - Seed initial data
 
 4. **Start the Phoenix server**
+
    ```bash
    mix phx.server
    ```
 
    Or start it inside IEx:
+
    ```bash
    iex -S mix phx.server
    ```

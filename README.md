@@ -5,8 +5,9 @@
 **Know what's happening around you before it finds you.**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![React Native](https://img.shields.io/badge/React%20Native-0.74-61dafb.svg)](https://reactnative.dev/)
-[![Node.js](https://img.shields.io/badge/Node.js-20.x-339933.svg)](https://nodejs.org/)
+[![Elixir](https://img.shields.io/badge/Elixir-1.15+-4B275F.svg)](https://elixir-lang.org/)
+[![Phoenix](https://img.shields.io/badge/Phoenix-1.8-FD4F00.svg)](https://www.phoenixframework.org/)
+[![React Native](https://img.shields.io/badge/React%20Native-0.81-61dafb.svg)](https://reactnative.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)](https://www.postgresql.org/)
 
 </div>
@@ -56,12 +57,11 @@ HotSpota/
 
 ### Prerequisites
 
-- Elixir 1.15+ and Erlang/OTP 26+ (for backend)
-- Node.js 20.x or higher (for mobile app and admin portal)
-- PostgreSQL 16 with PostGIS extension
-- Redis 7.x
-- iOS Simulator (Mac) or Android Studio
-- Expo CLI
+- **Elixir 1.15+** and **Erlang/OTP 26+** (for backend)
+- **Node.js 18.x or higher** (for mobile app)
+- **PostgreSQL 16** with **PostGIS extension**
+- **iOS Simulator** (Mac) or **Android Studio** (for mobile development)
+- **Expo CLI** (installed via npx)
 
 ### Installation
 
@@ -148,12 +148,12 @@ All core technologies use permissive open-source licenses (MIT, BSD, Apache-2.0)
 - [x] One-tap incident reporting with photo upload
 - [x] Incident feed with filtering
 - [x] Push notifications for nearby incidents
-- [x] Community verification system
-- [x] **Hotspot zone geofencing with entry/exit alerts**
-- [x] Heat zone visualization
-- [x] Analytics dashboard
-- [x] Premium subscriptions (extended radius, Travel Mode)
-- [x] Offline support with sync
+- [ ] Community verification system
+- [ ] **Hotspot zone geofencing with entry/exit alerts**
+- [ ] Heat zone visualization
+- [ ] Analytics dashboard
+- [ ] Premium subscriptions (extended radius, Travel Mode)
+- [ ] Offline support with sync
 - [ ] Admin portal for moderation
 
 ### Phase 2 (Future)
