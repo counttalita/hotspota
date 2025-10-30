@@ -64,7 +64,9 @@ defmodule HotspotApi.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       # CORS
-      {:cors_plug, "~> 3.0"}
+      {:cors_plug, "~> 3.0"},
+      # Rate limiting
+      {:hammer, "~> 6.2"}
     ]
   end
 

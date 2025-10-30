@@ -27,6 +27,35 @@ api.interceptors.request.use(
 
 export const incidentService = {
   /**
+   * Upload a photo to Appwrite storage
+   * @param {Object} photo - The photo object from image picker
+   * @param {string} photo.uri - Local URI of the photo
+   * @param {string} photo.type - MIME type of the photo
+   * @param {string} photo.fileName - Name of the file
+   * @returns {Promise<Object>} Object containing file_id and photo_url
+   */
+  async uploadPhoto(photo) {
+    try {
+      const formData = new FormData();
+      formData.append('photo', {
+        uri: photo.uri,
+        type: photo.type || 'image/jpeg',
+        name: photo.fileName || 'incident_photo.jpg',
+      });
+
+      const response = await api.post('/incidents/upload-photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error uploading photo:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
    * Create a new incident report
    * @param {Object} incidentData - The incident data
    * @param {string} incidentData.type - Type of incident (hijacking, mugging, accident)
@@ -82,6 +111,86 @@ export const incidentService = {
       return response.data.data;
     } catch (error) {
       console.error('Error verifying incident:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Queue an incident report for offline submission
+   * @param {Object} incidentData - The incident data to queue
+   */
+  async queueOfflineReport(incidentData) {
+    try {
+      const queueKey = 'offline_incident_queue';
+      const existingQueue = await AsyncStorage.getItem(queueKey);
+      const queue = existingQueue ? JSON.parse(existingQueue) : [];
+      
+      const queuedReport = {
+        ...incidentData,
+        queuedAt: new Date().toISOString(),
+        id: `temp_${Date.now()}`,
+      };
+      
+      queue.push(queuedReport);
+      await AsyncStorage.setItem(queueKey, JSON.stringify(queue));
+      
+      return queuedReport;
+    } catch (error) {
+      console.error('Error queuing offline report:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get all queued offline reports
+   * @returns {Promise<Array>} Array of queued reports
+   */
+  async getOfflineQueue() {
+    try {
+      const queueKey = 'offline_incident_queue';
+      const existingQueue = await AsyncStorage.getItem(queueKey);
+      return existingQueue ? JSON.parse(existingQueue) : [];
+    } catch (error) {
+      console.error('Error getting offline queue:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Sync all queued offline reports to the server
+   * @returns {Promise<Object>} Object with success and failed counts
+   */
+  async syncOfflineReports() {
+    try {
+      const queue = await this.getOfflineQueue();
+      if (queue.length === 0) {
+        return { success: 0, failed: 0 };
+      }
+
+      let successCount = 0;
+      let failedCount = 0;
+      const remainingQueue = [];
+
+      for (const report of queue) {
+        try {
+          // Remove temporary fields
+          const { queuedAt, id, ...reportData } = report;
+          await this.create(reportData);
+          successCount++;
+        } catch (error) {
+          console.error('Failed to sync report:', error);
+          failedCount++;
+          remainingQueue.push(report);
+        }
+      }
+
+      // Update queue with only failed reports
+      const queueKey = 'offline_incident_queue';
+      await AsyncStorage.setItem(queueKey, JSON.stringify(remainingQueue));
+
+      return { success: successCount, failed: failedCount };
+    } catch (error) {
+      console.error('Error syncing offline reports:', error);
       throw error;
     }
   },

@@ -56,12 +56,23 @@ defmodule HotspotApi.Incidents do
 
   """
   def create_incident(attrs) do
-    # Set expiration to 48 hours from now if not provided
-    attrs = Map.put_new(attrs, :expires_at, DateTime.add(DateTime.utc_now(), 48, :hour))
+    # Normalize to string keys and set expiration to 48 hours from now if not provided
+    attrs =
+      attrs
+      |> normalize_keys()
+      |> Map.put_new("expires_at", DateTime.add(DateTime.utc_now(), 48, :hour))
 
     %Incident{}
     |> Incident.changeset(attrs)
     |> Repo.insert()
+  end
+
+  # Normalize map keys to strings
+  defp normalize_keys(attrs) when is_map(attrs) do
+    Enum.reduce(attrs, %{}, fn {key, value}, acc ->
+      string_key = if is_atom(key), do: Atom.to_string(key), else: key
+      Map.put(acc, string_key, value)
+    end)
   end
 
   @doc """

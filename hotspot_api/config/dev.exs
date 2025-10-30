@@ -77,3 +77,7 @@ config :hotspot_api,
 config :hotspot_api, HotspotApi.Guardian,
   issuer: "hotspot_api",
   secret_key: "dev_secret_key_replace_in_production_with_mix_phx_gen_secret"
+
+# Hammer rate limiting configuration
+config :hammer,
+  backend: {Hammer.Backend.ETS, [expiry_ms: 60_000 * 60 * 4, cleanup_interval_ms: 60_000 * 10]}

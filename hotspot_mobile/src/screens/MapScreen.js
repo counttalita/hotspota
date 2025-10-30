@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
+import NetInfo from '@react-native-community/netinfo';
 import { incidentService } from '../services/incidentService';
+import ReportIncidentModal from '../components/ReportIncidentModal';
 
 const INCIDENT_COLORS = {
   hijacking: '#EF4444', // red
@@ -23,10 +25,13 @@ const MapScreen = () => {
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [loading, setLoading] = useState(true);
   const [locationPermission, setLocationPermission] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const mapRef = useRef(null);
 
   useEffect(() => {
     requestLocationPermission();
+    setupConnectivityListener();
   }, []);
 
   useEffect(() => {
@@ -34,6 +39,34 @@ const MapScreen = () => {
       fetchNearbyIncidents();
     }
   }, [userLocation]);
+
+  const setupConnectivityListener = () => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected);
+      
+      // Try to sync offline reports when connection is restored
+      if (state.isConnected) {
+        syncOfflineReports();
+      }
+    });
+
+    return unsubscribe;
+  };
+
+  const syncOfflineReports = async () => {
+    try {
+      const result = await incidentService.syncOfflineReports();
+      if (result.success > 0) {
+        Alert.alert(
+          'Reports Synced',
+          `${result.success} queued report(s) have been submitted successfully.`
+        );
+        fetchNearbyIncidents(); // Refresh the map
+      }
+    } catch (error) {
+      console.error('Error syncing offline reports:', error);
+    }
+  };
 
   const requestLocationPermission = async () => {
     try {
@@ -131,6 +164,17 @@ const MapScreen = () => {
     return `${(meters / 1000).toFixed(1)}km away`;
   };
 
+  const handleReportSuccess = (incident) => {
+    // Add the new incident to the map immediately
+    setIncidents(prev => [incident, ...prev]);
+    
+    // Show success message
+    Alert.alert(
+      'Success',
+      'Your incident report has been submitted successfully.'
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -222,6 +266,28 @@ const MapScreen = () => {
           <Text style={styles.zoomButtonText}>−</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Floating Report Incident Button */}
+      <TouchableOpacity
+        style={styles.reportButton}
+        onPress={() => setReportModalVisible(true)}
+      >
+        <Text style={styles.reportButtonText}>+ Report Incident</Text>
+      </TouchableOpacity>
+
+      {/* Offline Indicator */}
+      {!isOnline && (
+        <View style={styles.offlineIndicator}>
+          <Text style={styles.offlineText}>📡 Offline</Text>
+        </View>
+      )}
+
+      {/* Report Incident Modal */}
+      <ReportIncidentModal
+        visible={reportModalVisible}
+        onClose={() => setReportModalVisible(false)}
+        onReportSuccess={handleReportSuccess}
+      />
 
       {/* Incident details card */}
       {selectedIncident && (
@@ -358,6 +424,44 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#374151',
     fontWeight: '600',
+  },
+  reportButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#EF4444',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+  reportButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  offlineIndicator: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  offlineText: {
+    color: '#92400E',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   incidentCard: {
     position: 'absolute',

@@ -10,6 +10,14 @@ defmodule HotspotApiWeb.Router do
     plug HotspotApiWeb.Auth.Pipeline
   end
 
+  pipeline :rate_limit_incident do
+    plug HotspotApiWeb.Plugs.RateLimiter
+  end
+
+  pipeline :validate_image do
+    plug HotspotApiWeb.Plugs.ImageValidator
+  end
+
   scope "/api", HotspotApiWeb do
     pipe_through :api
 
@@ -24,9 +32,16 @@ defmodule HotspotApiWeb.Router do
     # Protected endpoints
     get "/auth/me", AuthController, :me
 
-    # Incident endpoints
-    post "/incidents", IncidentsController, :create
+    # Incident endpoints (without rate limiting for photo upload)
+    post "/incidents/upload-photo", IncidentsController, :upload_photo
     get "/incidents/nearby", IncidentsController, :nearby
+  end
+
+  scope "/api", HotspotApiWeb do
+    pipe_through [:api, :auth, :rate_limit_incident]
+
+    # Rate-limited incident creation
+    post "/incidents", IncidentsController, :create
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

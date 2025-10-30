@@ -45,6 +45,12 @@ config :hotspot_api, Oban,
   plugins: [Oban.Plugins.Pruner],
   queues: [default: 10, zone_updates: 5, notifications: 20]
 
+# Configure Appwrite
+config :hotspot_api,
+  appwrite_endpoint: System.get_env("APPWRITE_ENDPOINT") || "https://cloud.appwrite.io/v1",
+  appwrite_project_id: System.get_env("APPWRITE_PROJECT_ID"),
+  appwrite_api_key: System.get_env("APPWRITE_API_KEY")
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
