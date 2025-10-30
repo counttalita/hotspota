@@ -94,18 +94,18 @@ The API will be available at [`http://localhost:4000`](http://localhost:4000)
 
 ## 📡 API Endpoints
 
-### Authentication
+### Implemented Endpoints
+
+**Authentication**
 ```
 POST   /api/auth/send-otp          # Send OTP to phone number
 POST   /api/auth/verify-otp        # Verify OTP and get JWT token
-POST   /api/auth/refresh-token     # Refresh JWT token
 GET    /api/auth/me                # Get current user
 ```
 
-### Incidents
+**Incidents**
 ```
-POST   /api/incidents              # Create incident report
-GET    /api/incidents/nearby       # Get incidents near location
+POST   /api/incidents              # Get incidents near location
 GET    /api/incidents/:id          # Get incident details
 PUT    /api/incidents/:id          # Update incident
 DELETE /api/incidents/:id          # Delete incident (admin only)
