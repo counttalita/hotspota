@@ -31,6 +31,9 @@ const ReportIncidentModal = ({ visible, onClose, onReportSuccess }) => {
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [validationError, setValidationError] = useState(null);
+  const [profanityWarning, setProfanityWarning] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     if (visible) {
@@ -114,6 +117,9 @@ const ReportIncidentModal = ({ visible, onClose, onReportSuccess }) => {
 
   const compressAndSetPhoto = async (asset) => {
     try {
+      setLoading(true);
+      setUploadProgress(0);
+
       // Compress image to reduce size
       const manipResult = await ImageManipulator.manipulateAsync(
         asset.uri,
@@ -121,14 +127,54 @@ const ReportIncidentModal = ({ visible, onClose, onReportSuccess }) => {
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
 
+      setUploadProgress(50);
+
+      // Validate image size (max 10MB)
+      const fileInfo = await fetch(manipResult.uri);
+      const blob = await fileInfo.blob();
+      const sizeInMB = blob.size / (1024 * 1024);
+
+      if (sizeInMB > 10) {
+        Alert.alert('Error', 'Image must be under 10MB. Please choose a smaller image.');
+        return;
+      }
+
+      setUploadProgress(100);
+
       setPhoto({
         uri: manipResult.uri,
         type: 'image/jpeg',
         fileName: `incident_${Date.now()}.jpg`,
+        size: blob.size,
       });
     } catch (error) {
       console.error('Error compressing photo:', error);
       Alert.alert('Error', 'Failed to process photo');
+    } finally {
+      setLoading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const validateDescription = (text) => {
+    setDescription(text);
+    setValidationError(null);
+    setProfanityWarning(false);
+
+    if (text.length > 0 && text.length < 10) {
+      setValidationError('Description must be at least 10 characters');
+    } else if (text.length > 500) {
+      setValidationError('Description must be at most 500 characters');
+    }
+
+    // Simple client-side profanity check
+    const profanityWords = ['fuck', 'shit', 'damn', 'bitch', 'asshole'];
+    const hasProfanity = profanityWords.some(word => 
+      text.toLowerCase().includes(word)
+    );
+    
+    if (hasProfanity) {
+      setProfanityWarning(true);
     }
   };
 
@@ -138,7 +184,19 @@ const ReportIncidentModal = ({ visible, onClose, onReportSuccess }) => {
       return;
     }
 
+    // Validate description length
+    if (description.trim().length > 0 && description.trim().length < 10) {
+      Alert.alert('Validation Error', 'Description must be at least 10 characters');
+      return;
+    }
+
+    if (description.trim().length > 500) {
+      Alert.alert('Validation Error', 'Description must be at most 500 characters');
+      return;
+    }
+
     setLoading(true);
+    setValidationError(null);
 
     try {
       let photoUrl = null;
@@ -146,11 +204,32 @@ const ReportIncidentModal = ({ visible, onClose, onReportSuccess }) => {
       // Upload photo if available and online
       if (photo && isOnline) {
         try {
+          setUploadProgress(0);
           const uploadResult = await incidentService.uploadPhoto(photo);
           photoUrl = uploadResult.photo_url;
+          setUploadProgress(100);
         } catch (error) {
           console.error('Photo upload failed:', error);
-          // Continue without photo if upload fails
+          
+          // Check for specific error types
+          if (error.response?.status === 422) {
+            Alert.alert('Image Rejected', error.response?.data?.error || 'Invalid image');
+            setLoading(false);
+            return;
+          } else if (error.response?.status === 409) {
+            Alert.alert('Duplicate Image', 'This image has already been uploaded');
+            setLoading(false);
+            return;
+          } else if (error.response?.status === 429) {
+            const retryAfter = error.response?.data?.retry_after || 3600;
+            Alert.alert(
+              'Rate Limit Exceeded',
+              `Too many uploads. Please try again in ${Math.ceil(retryAfter / 60)} minutes.`
+            );
+            setLoading(false);
+            return;
+          }
+          // Continue without photo if other errors
         }
       }
 
@@ -180,9 +259,22 @@ const ReportIncidentModal = ({ visible, onClose, onReportSuccess }) => {
       handleClose();
     } catch (error) {
       console.error('Error submitting report:', error);
-      Alert.alert('Error', error.response?.data?.error || 'Failed to submit report');
+      
+      // Handle rate limiting
+      if (error.response?.status === 429) {
+        const retryAfter = error.response?.data?.retry_after || 3600;
+        Alert.alert(
+          'Rate Limit Exceeded',
+          `You can only create 5 incidents per hour. Please try again in ${Math.ceil(retryAfter / 60)} minutes.`
+        );
+      } else if (error.response?.status === 403) {
+        Alert.alert('Account Flagged', error.response?.data?.message || 'Your account has been flagged. Please contact support.');
+      } else {
+        Alert.alert('Error', error.response?.data?.error || 'Failed to submit report');
+      }
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -256,32 +348,56 @@ const ReportIncidentModal = ({ visible, onClose, onReportSuccess }) => {
                 {/* Description Input */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>
-                    Description (Optional, max 280 characters)
+                    Description (Optional, 10-500 characters)
                   </Text>
                   <TextInput
-                    style={styles.textInput}
+                    style={[
+                      styles.textInput,
+                      validationError && styles.textInputError,
+                    ]}
                     placeholder="Describe what happened..."
                     value={description}
-                    onChangeText={setDescription}
-                    maxLength={280}
+                    onChangeText={validateDescription}
+                    maxLength={500}
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
                   />
-                  <Text style={styles.charCount}>
-                    {description.length}/280
-                  </Text>
+                  <View style={styles.inputFooter}>
+                    <Text style={styles.charCount}>
+                      {description.length}/500
+                    </Text>
+                  </View>
+                  {validationError && (
+                    <Text style={styles.errorText}>{validationError}</Text>
+                  )}
+                  {profanityWarning && (
+                    <View style={styles.warningBanner}>
+                      <Text style={styles.warningText}>
+                        ⚠️ Your description may contain inappropriate language
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Photo Section */}
                 <View style={styles.photoSection}>
-                  <Text style={styles.inputLabel}>Photo (Optional)</Text>
+                  <Text style={styles.inputLabel}>Photo (Optional, max 10MB)</Text>
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <View style={styles.progressBar}>
+                      <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
+                    </View>
+                  )}
                   {photo ? (
                     <View style={styles.photoPreview}>
                       <Image source={{ uri: photo.uri }} style={styles.photoImage} />
+                      <Text style={styles.photoSize}>
+                        Size: {(photo.size / (1024 * 1024)).toFixed(2)} MB
+                      </Text>
                       <TouchableOpacity
                         style={styles.removePhotoButton}
                         onPress={() => setPhoto(null)}
+                        disabled={loading}
                       >
                         <Text style={styles.removePhotoText}>✕ Remove</Text>
                       </TouchableOpacity>
@@ -291,12 +407,14 @@ const ReportIncidentModal = ({ visible, onClose, onReportSuccess }) => {
                       <TouchableOpacity
                         style={styles.photoButton}
                         onPress={handleTakePhoto}
+                        disabled={loading}
                       >
                         <Text style={styles.photoButtonText}>📷 Take Photo</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.photoButton}
                         onPress={handlePickPhoto}
+                        disabled={loading}
                       >
                         <Text style={styles.photoButtonText}>🖼️ Choose Photo</Text>
                       </TouchableOpacity>
@@ -445,8 +563,47 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'right',
   },
+  inputFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  textInputError: {
+    borderColor: '#EF4444',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
+  },
+  warningBanner: {
+    backgroundColor: '#FEF3C7',
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#92400E',
+    fontWeight: '600',
+  },
   photoSection: {
     gap: 8,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+  },
+  photoSize: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
   },
   photoButtons: {
     flexDirection: 'row',

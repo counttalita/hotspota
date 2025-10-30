@@ -5,7 +5,7 @@ defmodule HotspotApi.Security do
 
   import Ecto.Query, warn: false
   alias HotspotApi.Repo
-  alias HotspotApi.Security.{IPBlocklist, AuthAttempt, IntrusionAlert}
+  alias HotspotApi.Security.{IPBlocklist, AuthAttempt, IntrusionAlert, SecurityEvent}
 
   ## IP Blocklist
 
@@ -230,4 +230,39 @@ defmodule HotspotApi.Security do
   end
 
   def sanitize_html(nil), do: nil
+
+  ## Security Events
+
+  @doc """
+  Logs a security event.
+  """
+  def log_event(attrs) do
+    %SecurityEvent{}
+    |> SecurityEvent.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Lists security events with optional filters.
+  """
+  def list_security_events(filters \\ %{}) do
+    SecurityEvent
+    |> apply_security_event_filters(filters)
+    |> order_by([e], desc: e.inserted_at)
+    |> limit(100)
+    |> Repo.all()
+  end
+
+  defp apply_security_event_filters(query, filters) do
+    Enum.reduce(filters, query, fn
+      {:event_type, type}, query ->
+        where(query, [e], e.event_type == ^type)
+      {:severity, severity}, query ->
+        where(query, [e], e.severity == ^severity)
+      {:user_id, user_id}, query ->
+        where(query, [e], e.user_id == ^user_id)
+      _, query ->
+        query
+    end)
+  end
 end

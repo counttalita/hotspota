@@ -11,7 +11,9 @@ defmodule HotspotApiWeb.IncidentsController do
   Upload a photo to Appwrite Storage and return the file ID.
   """
   def upload_photo(conn, %{"photo" => %Plug.Upload{} = upload}) do
-    with {:ok, file_binary} <- File.read(upload.path),
+    # Validate image before upload
+    with {:ok, hash} <- HotspotApi.Moderation.validate_image(upload.path, upload.content_type),
+         {:ok, file_binary} <- File.read(upload.path),
          {:ok, file_id} <- Appwrite.upload_file(file_binary, upload.filename, upload.content_type) do
       photo_url = Appwrite.get_file_url(file_id)
 
@@ -19,9 +21,25 @@ defmodule HotspotApiWeb.IncidentsController do
       |> put_status(:created)
       |> json(%{
         file_id: file_id,
-        photo_url: photo_url
+        photo_url: photo_url,
+        hash: hash
       })
     else
+      {:error, :invalid_file_type, message} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: message})
+
+      {:error, :file_too_large, message} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: message})
+
+      {:error, :duplicate_image, message} ->
+        conn
+        |> put_status(:conflict)
+        |> json(%{error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
@@ -41,21 +59,55 @@ defmodule HotspotApiWeb.IncidentsController do
   def create(conn, %{"incident" => incident_params}) do
     # Get user_id from Guardian claims
     user_id = Guardian.Plug.current_resource(conn).id
-    incident_params = Map.put(incident_params, "user_id", user_id)
 
-    case Incidents.create_incident(incident_params) do
-      {:ok, %Incident{} = incident} ->
-        # Send notifications to nearby users asynchronously
-        Task.start(fn ->
-          HotspotApi.Notifications.send_incident_alert(incident.id, incident.location)
-        end)
+    # Validate description if present
+    with :ok <- validate_description(incident_params["description"]),
+         :ok <- check_repeat_offender(user_id) do
+      incident_params = Map.put(incident_params, "user_id", user_id)
 
+      case Incidents.create_incident(incident_params) do
+        {:ok, %Incident{} = incident} ->
+          # Send notifications to nearby users asynchronously
+          Task.start(fn ->
+            HotspotApi.Notifications.send_incident_alert(incident.id, incident.location)
+          end)
+
+          conn
+          |> put_status(:created)
+          |> render(:show, incident: incident)
+
+        {:error, changeset} ->
+          {:error, changeset}
+      end
+    else
+      {:error, :text_validation_failed, message} ->
         conn
-        |> put_status(:created)
-        |> render(:show, incident: incident)
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: message})
 
-      {:error, changeset} ->
-        {:error, changeset}
+      {:error, :repeat_offender, count} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{
+          error: "Account flagged",
+          message: "Your account has been flagged for #{count} violations. Please contact support."
+        })
+    end
+  end
+
+  defp validate_description(nil), do: :ok
+  defp validate_description(""), do: :ok
+  defp validate_description(description) do
+    case HotspotApi.Moderation.validate_text(description, min_length: 10, max_length: 500) do
+      {:ok, _sanitized} -> :ok
+      {:error, _reason, message} -> {:error, :text_validation_failed, message}
+    end
+  end
+
+  defp check_repeat_offender(user_id) do
+    case HotspotApi.Moderation.check_repeat_offender(user_id) do
+      {:ok, _count} -> :ok
+      {:warning, :repeat_offender, count} -> {:error, :repeat_offender, count}
     end
   end
 

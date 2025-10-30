@@ -43,6 +43,10 @@ defmodule HotspotApiWeb.Router do
     post "/notifications/register-token", NotificationsController, :register_token
     get "/notifications/preferences", NotificationsController, :get_preferences
     put "/notifications/preferences", NotificationsController, :update_preferences
+
+    # Moderation endpoints
+    post "/moderation/validate-image", ModerationController, :validate_image
+    post "/moderation/validate-text", ModerationController, :validate_text
   end
 
   scope "/api", HotspotApiWeb do
@@ -50,6 +54,16 @@ defmodule HotspotApiWeb.Router do
 
     # Rate-limited incident creation
     post "/incidents", IncidentsController, :create
+  end
+
+  # Admin routes (TODO: Add admin authentication pipeline)
+  scope "/api/admin", HotspotApiWeb.Admin, as: :admin do
+    pipe_through :api
+
+    # Moderation endpoints
+    get "/moderation/flagged-content", ModerationController, :flagged_content
+    get "/moderation/flagged-content/:id", ModerationController, :show_flagged_content
+    put "/moderation/flagged-content/:id", ModerationController, :update_flagged_content
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
