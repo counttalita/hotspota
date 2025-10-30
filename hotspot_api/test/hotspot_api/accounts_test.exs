@@ -116,7 +116,7 @@ defmodule HotspotApi.AccountsTest do
 
     test "verify_otp/2 with expired code returns error" do
       # Create an expired OTP manually
-      expired_at = DateTime.utc_now() |> DateTime.add(-3600, :second)
+      expired_at = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
 
       {:ok, otp} = Repo.insert(%Accounts.OtpCode{
         phone_number: @valid_phone,

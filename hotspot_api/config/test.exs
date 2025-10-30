@@ -31,3 +31,18 @@ config :logger, level: :warning
 
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# Guardian configuration for tests
+config :hotspot_api, HotspotApi.Guardian,
+  issuer: "hotspot_api",
+  secret_key: "test_secret_key_for_guardian_jwt_tokens_in_test_environment"
+
+# Twilio configuration (disabled in test)
+config :hotspot_api,
+  twilio_account_sid: nil,
+  twilio_auth_token: nil,
+  twilio_phone_number: nil
+
+
+# Disable Oban in test environment
+config :hotspot_api, Oban, testing: :manual
