@@ -29,6 +29,8 @@ const MapScreen = () => {
   const [locationPermission, setLocationPermission] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [verifyingIncident, setVerifyingIncident] = useState(false);
+  const [verifiedIncidents, setVerifiedIncidents] = useState(new Set());
   const mapRef = useRef(null);
 
   useEffect(() => {
@@ -245,6 +247,56 @@ const MapScreen = () => {
     );
   };
 
+  const handleVerifyIncident = async (incidentId) => {
+    if (!isOnline) {
+      Alert.alert('Offline', 'You need to be online to verify incidents.');
+      return;
+    }
+
+    if (verifiedIncidents.has(incidentId)) {
+      Alert.alert('Already Verified', 'You have already verified this incident.');
+      return;
+    }
+
+    setVerifyingIncident(true);
+
+    try {
+      const result = await incidentService.verify(incidentId);
+      
+      // Update the incident in the list with new verification count
+      setIncidents(prev =>
+        prev.map(incident =>
+          incident.id === incidentId
+            ? {
+                ...incident,
+                verification_count: result.verification_count,
+                is_verified: result.is_verified,
+              }
+            : incident
+        )
+      );
+
+      // Update selected incident if it's the one being verified
+      if (selectedIncident && selectedIncident.id === incidentId) {
+        setSelectedIncident({
+          ...selectedIncident,
+          verification_count: result.verification_count,
+          is_verified: result.is_verified,
+        });
+      }
+
+      // Mark as verified by this user
+      setVerifiedIncidents(prev => new Set([...prev, incidentId]));
+
+      Alert.alert('Success', result.message || 'Incident verified successfully!');
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || 'Failed to verify incident';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setVerifyingIncident(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -396,12 +448,33 @@ const MapScreen = () => {
           )}
 
           <View style={styles.verificationInfo}>
-            <Text style={styles.verificationText}>
-              {selectedIncident.is_verified ? '✓ Verified' : 'Unverified'}
-            </Text>
-            <Text style={styles.verificationCount}>
-              {selectedIncident.verification_count} upvotes
-            </Text>
+            <View style={styles.verificationStatus}>
+              {selectedIncident.is_verified && (
+                <View style={styles.verifiedBadge}>
+                  <Text style={styles.verifiedBadgeText}>✓ Verified</Text>
+                </View>
+              )}
+              <Text style={styles.verificationCount}>
+                {selectedIncident.verification_count} upvote{selectedIncident.verification_count !== 1 ? 's' : ''}
+              </Text>
+            </View>
+            
+            <TouchableOpacity
+              style={[
+                styles.verifyButton,
+                (verifiedIncidents.has(selectedIncident.id) || verifyingIncident) && styles.verifyButtonDisabled
+              ]}
+              onPress={() => handleVerifyIncident(selectedIncident.id)}
+              disabled={verifiedIncidents.has(selectedIncident.id) || verifyingIncident}
+            >
+              {verifyingIncident ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.verifyButtonText}>
+                  {verifiedIncidents.has(selectedIncident.id) ? '✓ Verified' : 'Verify'}
+                </Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -590,18 +663,46 @@ const styles = StyleSheet.create({
   verificationInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
-  verificationText: {
-    fontSize: 14,
-    color: '#10B981',
+  verificationStatus: {
+    flexDirection: 'column',
+    gap: 4,
+  },
+  verifiedBadge: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  verifiedBadgeText: {
+    fontSize: 12,
+    color: '#065F46',
     fontWeight: '600',
   },
   verificationCount: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  verifyButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  verifyButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  verifyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

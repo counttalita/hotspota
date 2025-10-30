@@ -42,7 +42,14 @@ config :phoenix, :json_library, Jason
 # Configure Oban for background jobs
 config :hotspot_api, Oban,
   repo: HotspotApi.Repo,
-  plugins: [Oban.Plugins.Pruner],
+  plugins: [
+    Oban.Plugins.Pruner,
+    {Oban.Plugins.Cron,
+     crontab: [
+       # Run incident expiry worker every hour
+       {"0 * * * *", HotspotApi.Workers.IncidentExpiryWorker}
+     ]}
+  ],
   queues: [default: 10, zone_updates: 5, notifications: 20]
 
 # Configure Appwrite

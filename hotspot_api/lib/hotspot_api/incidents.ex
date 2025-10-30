@@ -8,6 +8,7 @@ defmodule HotspotApi.Incidents do
   alias HotspotApi.Repo
 
   alias HotspotApi.Incidents.Incident
+  alias HotspotApi.Incidents.IncidentVerification
 
   @doc """
   Returns the list of incidents that haven't expired.
@@ -258,5 +259,109 @@ defmodule HotspotApi.Incidents do
     c = 2 * :math.atan2(:math.sqrt(a), :math.sqrt(1 - a))
 
     round(r * c)
+  end
+
+  @doc """
+  Verifies an incident by a user. Creates a verification record and updates the incident's verification count.
+  Automatically marks the incident as verified if it receives 3+ upvotes within 2 hours of creation.
+
+  ## Parameters
+    - incident_id: The ID of the incident to verify
+    - user_id: The ID of the user verifying the incident
+
+  ## Returns
+    - {:ok, %IncidentVerification{}} on success
+    - {:error, %Ecto.Changeset{}} if validation fails (duplicate vote, self-verification, etc.)
+
+  ## Examples
+
+      iex> verify_incident("incident-id", "user-id")
+      {:ok, %IncidentVerification{}}
+
+      iex> verify_incident("incident-id", "same-user-id")
+      {:error, %Ecto.Changeset{errors: [user_id: {"You cannot verify your own incident", []}]}}
+
+  """
+  def verify_incident(incident_id, user_id) do
+    Repo.transaction(fn ->
+      # Create the verification record
+      verification_result =
+        %IncidentVerification{}
+        |> IncidentVerification.changeset(%{incident_id: incident_id, user_id: user_id})
+        |> Repo.insert()
+
+      case verification_result do
+        {:ok, verification} ->
+          # Increment verification count
+          incident = Repo.get!(Incident, incident_id)
+          new_count = incident.verification_count + 1
+
+          # Check if incident should be auto-verified (3+ upvotes within 2 hours)
+          two_hours_ago = DateTime.add(DateTime.utc_now(), -2, :hour)
+          should_verify = new_count >= 3 && DateTime.compare(incident.inserted_at, two_hours_ago) == :gt
+
+          # Update incident
+          incident
+          |> Incident.changeset(%{
+            verification_count: new_count,
+            is_verified: should_verify || incident.is_verified
+          })
+          |> Repo.update!()
+
+          verification
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  @doc """
+  Gets all verifications for a specific incident.
+
+  ## Examples
+
+      iex> get_incident_verifications("incident-id")
+      [%IncidentVerification{}, ...]
+
+  """
+  def get_incident_verifications(incident_id) do
+    IncidentVerification
+    |> where([v], v.incident_id == ^incident_id)
+    |> Repo.all()
+  end
+
+  @doc """
+  Checks if a user has already verified a specific incident.
+
+  ## Examples
+
+      iex> user_verified_incident?("incident-id", "user-id")
+      true
+
+  """
+  def user_verified_incident?(incident_id, user_id) do
+    IncidentVerification
+    |> where([v], v.incident_id == ^incident_id and v.user_id == ^user_id)
+    |> Repo.exists?()
+  end
+
+  @doc """
+  Deletes expired incidents (those with zero verifications after 48 hours).
+  This function is meant to be called by the IncidentExpiryWorker.
+
+  ## Examples
+
+      iex> delete_expired_incidents()
+      {5, nil}  # Returns number of deleted incidents
+
+  """
+  def delete_expired_incidents do
+    now = DateTime.utc_now()
+
+    # Delete incidents that have expired and have zero verifications
+    Incident
+    |> where([i], i.expires_at <= ^now and i.verification_count == 0)
+    |> Repo.delete_all()
   end
 end

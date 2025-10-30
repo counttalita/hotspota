@@ -78,6 +78,54 @@ defmodule HotspotApiWeb.IncidentsController do
   end
 
   @doc """
+  Verify an incident (upvote)
+  """
+  def verify(conn, %{"id" => incident_id}) do
+    user_id = Guardian.Plug.current_resource(conn).id
+
+    case Incidents.verify_incident(incident_id, user_id) do
+      {:ok, _verification} ->
+        # Get updated incident to return current verification count
+        incident = Incidents.get_incident!(incident_id)
+
+        conn
+        |> put_status(:created)
+        |> json(%{
+          message: "Incident verified successfully",
+          verification_count: incident.verification_count,
+          is_verified: incident.is_verified
+        })
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
+
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: format_error(errors)})
+    end
+  end
+
+  @doc """
+  Get verifications for an incident
+  """
+  def verifications(conn, %{"id" => incident_id}) do
+    verifications = Incidents.get_incident_verifications(incident_id)
+
+    conn
+    |> json(%{
+      incident_id: incident_id,
+      verification_count: length(verifications),
+      verifications: Enum.map(verifications, fn v ->
+        %{
+          id: v.id,
+          user_id: v.user_id,
+          verified_at: v.inserted_at
+        }
+      end)
+    })
+  end
+
+  @doc """
   Get paginated incident feed with filtering
   """
   def feed(conn, params) do
@@ -168,5 +216,13 @@ defmodule HotspotApiWeb.IncidentsController do
       inserted_at: incident.inserted_at,
       expires_at: incident.expires_at
     }
+  end
+
+  defp format_error(errors) when is_map(errors) do
+    errors
+    |> Enum.map(fn {field, messages} ->
+      "#{field}: #{Enum.join(messages, ", ")}"
+    end)
+    |> Enum.join("; ")
   end
 end

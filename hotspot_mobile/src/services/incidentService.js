@@ -142,14 +142,29 @@ export const incidentService = {
   /**
    * Verify/upvote an incident
    * @param {string} incidentId - The incident ID
-   * @returns {Promise<Object>} The updated incident
+   * @returns {Promise<Object>} The verification result with updated counts
    */
   async verify(incidentId) {
     try {
       const response = await api.post(`/incidents/${incidentId}/verify`);
-      return response.data.data;
+      return response.data;
     } catch (error) {
       console.error('Error verifying incident:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Get verifications for an incident
+   * @param {string} incidentId - The incident ID
+   * @returns {Promise<Object>} Object containing verification count and list
+   */
+  async getVerifications(incidentId) {
+    try {
+      const response = await api.get(`/incidents/${incidentId}/verifications`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching verifications:', error.response?.data || error.message);
       throw error;
     }
   },
