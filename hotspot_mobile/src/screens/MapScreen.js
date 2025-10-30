@@ -10,7 +10,9 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
+import geohash from 'ngeohash';
 import { incidentService } from '../services/incidentService';
+import websocketService from '../services/websocketService';
 import ReportIncidentModal from '../components/ReportIncidentModal';
 
 const INCIDENT_COLORS = {
@@ -32,13 +34,81 @@ const MapScreen = () => {
   useEffect(() => {
     requestLocationPermission();
     setupConnectivityListener();
+    initializeWebSocket();
+
+    // Cleanup on unmount
+    return () => {
+      websocketService.disconnect();
+    };
   }, []);
 
   useEffect(() => {
     if (userLocation) {
       fetchNearbyIncidents();
+      updateWebSocketLocation(userLocation);
     }
   }, [userLocation]);
+
+  const initializeWebSocket = async () => {
+    try {
+      const connected = await websocketService.connect();
+      
+      if (connected) {
+        // Subscribe to new incident events
+        websocketService.onNewIncident((incident) => {
+          handleNewIncidentFromWebSocket(incident);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to initialize WebSocket:', error);
+    }
+  };
+
+  const updateWebSocketLocation = (location) => {
+    // Calculate geohash for current location
+    const currentGeohash = geohash.encode(location.latitude, location.longitude, 6);
+    
+    // Join incident channel for this geohash
+    websocketService.joinIncidentChannel(currentGeohash);
+    
+    // Update location on the server
+    websocketService.updateLocation(location.latitude, location.longitude);
+  };
+
+  const handleNewIncidentFromWebSocket = (incident) => {
+    console.log('Received new incident via WebSocket:', incident);
+    
+    // Add the new incident to the map if not already present
+    setIncidents(prev => {
+      const exists = prev.some(i => i.id === incident.id);
+      if (exists) return prev;
+      
+      // Transform incident data to match expected format
+      const newIncident = {
+        id: incident.id,
+        type: incident.type,
+        location: {
+          latitude: incident.latitude,
+          longitude: incident.longitude,
+        },
+        description: incident.description,
+        photo_url: incident.photo_url,
+        verification_count: incident.verification_count,
+        is_verified: incident.is_verified,
+        inserted_at: incident.inserted_at,
+      };
+      
+      return [newIncident, ...prev];
+    });
+    
+    // Show a brief notification (optional)
+    Alert.alert(
+      'New Incident Nearby',
+      `A ${incident.type} was just reported in your area.`,
+      [{ text: 'OK' }],
+      { cancelable: true }
+    );
+  };
 
   const setupConnectivityListener = () => {
     const unsubscribe = NetInfo.addEventListener(state => {

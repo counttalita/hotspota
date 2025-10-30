@@ -62,9 +62,20 @@ defmodule HotspotApi.Incidents do
       |> normalize_keys()
       |> Map.put_new("expires_at", DateTime.add(DateTime.utc_now(), 48, :hour))
 
-    %Incident{}
-    |> Incident.changeset(attrs)
-    |> Repo.insert()
+    result =
+      %Incident{}
+      |> Incident.changeset(attrs)
+      |> Repo.insert()
+
+    # Broadcast new incident to Phoenix Channels
+    case result do
+      {:ok, incident} ->
+        HotspotApiWeb.IncidentChannel.broadcast_new_incident(incident)
+        {:ok, incident}
+
+      error ->
+        error
+    end
   end
 
   # Normalize map keys to strings

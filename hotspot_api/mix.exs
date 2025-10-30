@@ -66,7 +66,9 @@ defmodule HotspotApi.MixProject do
       # CORS
       {:cors_plug, "~> 3.0"},
       # Rate limiting
-      {:hammer, "~> 6.2"}
+      {:hammer, "~> 6.2"},
+      # Geohash for location-based channels
+      {:geohash, "~> 1.3"}
     ]
   end
 
