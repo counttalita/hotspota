@@ -1,0 +1,58 @@
+# Kiro files
+.kiro/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+deps/
+_build/
+
+# Elixir / Phoenix
+*.beam
+*.ez
+.fetch
+erl_crash.dump
+hotspot_api-*.tar
+priv/static/
+
+# React Native / Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+*.pem
