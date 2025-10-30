@@ -1,73 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { authService } from '../services/authService';
+import React from 'react';
+import MapScreen from './MapScreen';
 
 export default function MainScreen({ navigation }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
-    try {
-      const userData = await authService.getUserData();
-      setUser(userData);
-    } catch (error) {
-      console.error('Failed to load user:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await authService.logout();
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'PhoneAuth' }],
-    });
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Welcome to Hotspot!</Text>
-        <Text style={styles.subtitle}>You're successfully authenticated</Text>
-
-        {user && (
-          <View style={styles.userInfo}>
-            <Text style={styles.label}>Phone Number:</Text>
-            <Text style={styles.value}>{user.phone_number}</Text>
-
-            <Text style={styles.label}>Account Type:</Text>
-            <Text style={styles.value}>
-              {user.is_premium ? 'Premium' : 'Free'}
-            </Text>
-
-            <Text style={styles.label}>Alert Radius:</Text>
-            <Text style={styles.value}>{user.alert_radius}m</Text>
-          </View>
-        )}
-
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.infoText}>
-          Map view and incident reporting features will be implemented in the next tasks.
-        </Text>
-      </View>
-    </View>
-  );
+  return <MapScreen navigation={navigation} />;
 }
 
 const styles = StyleSheet.create({

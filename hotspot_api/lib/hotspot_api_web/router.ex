@@ -23,6 +23,10 @@ defmodule HotspotApiWeb.Router do
 
     # Protected endpoints
     get "/auth/me", AuthController, :me
+
+    # Incident endpoints
+    post "/incidents", IncidentsController, :create
+    get "/incidents/nearby", IncidentsController, :nearby
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
