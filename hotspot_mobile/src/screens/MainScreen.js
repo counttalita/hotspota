@@ -1,67 +1,60 @@
 import React from 'react';
+import { StyleSheet, Text } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MapScreen from './MapScreen';
+import IncidentFeedScreen from './IncidentFeedScreen';
 
-export default function MainScreen({ navigation }) {
-  return <MapScreen navigation={navigation} />;
+const Tab = createBottomTabNavigator();
+
+export default function MainScreen() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#007AFF',
+        tabBarInactiveTintColor: '#999',
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabBarLabel,
+      }}
+    >
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={{
+          tabBarIcon: ({ color }) => <TabIcon icon="🗺️" color={color} />,
+          tabBarLabel: 'Map',
+        }}
+      />
+      <Tab.Screen
+        name="Feed"
+        component={IncidentFeedScreen}
+        options={{
+          tabBarIcon: ({ color }) => <TabIcon icon="📋" color={color} />,
+          tabBarLabel: 'Feed',
+        }}
+      />
+    </Tab.Navigator>
+  );
 }
 
+// Simple icon component using emoji
+const TabIcon = ({ icon, color }) => (
+  <Text style={{ fontSize: 24, opacity: color === '#007AFF' ? 1 : 0.5 }}>
+    {icon}
+  </Text>
+);
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  tabBar: {
+    backgroundColor: '#FFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    height: 60,
+    paddingBottom: 8,
+    paddingTop: 8,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 32,
-    textAlign: 'center',
-  },
-  userInfo: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  value: {
-    fontSize: 18,
-    color: '#1a1a1a',
+  tabBarLabel: {
+    fontSize: 12,
     fontWeight: '600',
-  },
-  logoutButton: {
-    height: 56,
-    backgroundColor: '#ff3b30',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  logoutText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
 });

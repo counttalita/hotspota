@@ -94,4 +94,92 @@ defmodule HotspotApiWeb.IncidentsControllerTest do
       assert json_response(conn, 400)
     end
   end
+
+  describe "GET /api/incidents/feed" do
+    test "returns paginated incident feed", %{conn: conn, user: user} do
+      # Create multiple incidents
+      for i <- 1..5 do
+        HotspotApi.Incidents.create_incident(%{
+          type: "mugging",
+          latitude: -26.2041,
+          longitude: 28.0473,
+          description: "Incident #{i}",
+          user_id: user.id
+        })
+      end
+
+      conn = get(conn, ~p"/api/incidents/feed?lat=-26.2041&lng=28.0473&page=1&page_size=3")
+      response = json_response(conn, 200)
+
+      assert %{"incidents" => incidents, "pagination" => pagination} = response
+      assert length(incidents) == 3
+      assert pagination["total_count"] == 5
+      assert pagination["page"] == 1
+      assert pagination["page_size"] == 3
+      assert pagination["total_pages"] == 2
+    end
+
+    test "filters incidents by type", %{conn: conn, user: user} do
+      # Create different types
+      HotspotApi.Incidents.create_incident(%{
+        type: "hijacking",
+        latitude: -26.2041,
+        longitude: 28.0473,
+        user_id: user.id
+      })
+
+      HotspotApi.Incidents.create_incident(%{
+        type: "mugging",
+        latitude: -26.2041,
+        longitude: 28.0473,
+        user_id: user.id
+      })
+
+      conn = get(conn, ~p"/api/incidents/feed?lat=-26.2041&lng=28.0473&type=hijacking")
+      response = json_response(conn, 200)
+
+      assert %{"incidents" => incidents} = response
+      assert length(incidents) == 1
+      assert hd(incidents)["type"] == "hijacking"
+    end
+
+    test "filters incidents by time range", %{conn: conn, user: user} do
+      # Create a recent incident
+      HotspotApi.Incidents.create_incident(%{
+        type: "accident",
+        latitude: -26.2041,
+        longitude: 28.0473,
+        user_id: user.id
+      })
+
+      conn = get(conn, ~p"/api/incidents/feed?lat=-26.2041&lng=28.0473&time_range=24h")
+      response = json_response(conn, 200)
+
+      assert %{"incidents" => incidents} = response
+      assert length(incidents) == 1
+    end
+
+    test "includes distance in feed results", %{conn: conn, user: user} do
+      HotspotApi.Incidents.create_incident(%{
+        type: "mugging",
+        latitude: -26.2041,
+        longitude: 28.0473,
+        user_id: user.id
+      })
+
+      conn = get(conn, ~p"/api/incidents/feed?lat=-26.2041&lng=28.0473")
+      response = json_response(conn, 200)
+
+      assert %{"incidents" => incidents} = response
+      assert length(incidents) == 1
+      incident = hd(incidents)
+      assert Map.has_key?(incident, "distance")
+      assert is_number(incident["distance"])
+    end
+
+    test "returns error with invalid coordinates", %{conn: conn} do
+      conn = get(conn, ~p"/api/incidents/feed?lat=invalid&lng=28.0473")
+      assert json_response(conn, 400)
+    end
+  end
 end

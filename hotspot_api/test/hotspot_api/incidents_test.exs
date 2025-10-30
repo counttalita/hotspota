@@ -113,5 +113,94 @@ defmodule HotspotApi.IncidentsTest do
       incident = incident_fixture()
       assert %Ecto.Changeset{} = Incidents.change_incident(incident)
     end
+
+    test "list_nearby_paginated/4 returns paginated incidents" do
+      user = user_fixture()
+
+      # Create 25 incidents at the same location
+      for _i <- 1..25 do
+        Incidents.create_incident(%{
+          type: "mugging",
+          latitude: -26.2041,
+          longitude: 28.0473,
+          user_id: user.id
+        })
+      end
+
+      # Get first page
+      result = Incidents.list_nearby_paginated(-26.2041, 28.0473, 5000, page: 1, page_size: 20)
+
+      assert length(result.incidents) == 20
+      assert result.total_count == 25
+      assert result.page == 1
+      assert result.page_size == 20
+      assert result.total_pages == 2
+    end
+
+    test "list_nearby_paginated/4 filters by incident type" do
+      user = user_fixture()
+
+      # Create different types of incidents
+      Incidents.create_incident(%{type: "hijacking", latitude: -26.2041, longitude: 28.0473, user_id: user.id})
+      Incidents.create_incident(%{type: "mugging", latitude: -26.2041, longitude: 28.0473, user_id: user.id})
+      Incidents.create_incident(%{type: "accident", latitude: -26.2041, longitude: 28.0473, user_id: user.id})
+
+      # Filter by hijacking
+      result = Incidents.list_nearby_paginated(-26.2041, 28.0473, 5000, type: "hijacking")
+
+      assert length(result.incidents) == 1
+      assert hd(result.incidents).type == "hijacking"
+    end
+
+    test "list_nearby_paginated/4 filters by time range" do
+      user = user_fixture()
+
+      # Create an old incident (simulate by creating and updating)
+      {:ok, old_incident} = Incidents.create_incident(%{
+        type: "mugging",
+        latitude: -26.2041,
+        longitude: 28.0473,
+        user_id: user.id
+      })
+
+      # Update the inserted_at to be 2 days ago
+      two_days_ago = DateTime.add(DateTime.utc_now(), -2, :day)
+      Repo.update_all(
+        from(i in Incident, where: i.id == ^old_incident.id),
+        set: [inserted_at: two_days_ago]
+      )
+
+      # Create a recent incident
+      Incidents.create_incident(%{
+        type: "hijacking",
+        latitude: -26.2041,
+        longitude: 28.0473,
+        user_id: user.id
+      })
+
+      # Filter by last 24 hours
+      result = Incidents.list_nearby_paginated(-26.2041, 28.0473, 5000, time_range: "24h")
+
+      assert length(result.incidents) == 1
+      assert hd(result.incidents).type == "hijacking"
+    end
+
+    test "list_nearby_paginated/4 includes distance in results" do
+      user = user_fixture()
+
+      Incidents.create_incident(%{
+        type: "accident",
+        latitude: -26.2041,
+        longitude: 28.0473,
+        user_id: user.id
+      })
+
+      result = Incidents.list_nearby_paginated(-26.2041, 28.0473, 5000)
+
+      assert length(result.incidents) == 1
+      incident = hd(result.incidents)
+      assert Map.has_key?(incident, :distance)
+      assert incident.distance >= 0
+    end
   end
 end

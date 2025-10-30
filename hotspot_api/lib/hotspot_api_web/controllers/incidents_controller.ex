@@ -72,6 +72,41 @@ defmodule HotspotApiWeb.IncidentsController do
     end
   end
 
+  @doc """
+  Get paginated incident feed with filtering
+  """
+  def feed(conn, params) do
+    with {:ok, latitude} <- parse_float(params["lat"], "latitude"),
+         {:ok, longitude} <- parse_float(params["lng"], "longitude") do
+      radius = parse_radius(params["radius"])
+
+      opts = [
+        type: params["type"],
+        time_range: params["time_range"] || "all",
+        page: parse_page(params["page"]),
+        page_size: parse_page_size(params["page_size"])
+      ]
+
+      result = Incidents.list_nearby_paginated(latitude, longitude, radius, opts)
+
+      conn
+      |> json(%{
+        incidents: Enum.map(result.incidents, &format_incident/1),
+        pagination: %{
+          total_count: result.total_count,
+          page: result.page,
+          page_size: result.page_size,
+          total_pages: result.total_pages
+        }
+      })
+    else
+      {:error, field} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid #{field} parameter"})
+    end
+  end
+
   defp parse_float(nil, field), do: {:error, field}
   defp parse_float(value, _field) when is_float(value), do: {:ok, value}
   defp parse_float(value, field) when is_binary(value) do
@@ -91,4 +126,42 @@ defmodule HotspotApiWeb.IncidentsController do
     end
   end
   defp parse_radius(_), do: 5000
+
+  defp parse_page(nil), do: 1
+  defp parse_page(page) when is_integer(page), do: max(page, 1)
+  defp parse_page(page) when is_binary(page) do
+    case Integer.parse(page) do
+      {int, _} -> max(int, 1)
+      :error -> 1
+    end
+  end
+  defp parse_page(_), do: 1
+
+  defp parse_page_size(nil), do: 20
+  defp parse_page_size(size) when is_integer(size), do: min(max(size, 1), 100)
+  defp parse_page_size(size) when is_binary(size) do
+    case Integer.parse(size) do
+      {int, _} -> min(max(int, 1), 100)
+      :error -> 20
+    end
+  end
+  defp parse_page_size(_), do: 20
+
+  defp format_incident(%Incident{location: %Geo.Point{coordinates: {lng, lat}}} = incident) do
+    %{
+      id: incident.id,
+      type: incident.type,
+      description: incident.description,
+      photo_url: incident.photo_url,
+      verification_count: incident.verification_count,
+      is_verified: incident.is_verified,
+      location: %{
+        latitude: lat,
+        longitude: lng
+      },
+      distance: Map.get(incident, :distance),
+      inserted_at: incident.inserted_at,
+      expires_at: incident.expires_at
+    }
+  end
 end

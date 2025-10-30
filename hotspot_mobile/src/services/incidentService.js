@@ -100,6 +100,46 @@ export const incidentService = {
   },
 
   /**
+   * Get paginated incident feed with filtering
+   * @param {number} latitude - Latitude coordinate
+   * @param {number} longitude - Longitude coordinate
+   * @param {Object} options - Filter and pagination options
+   * @param {number} [options.radius=5000] - Search radius in meters
+   * @param {string} [options.type] - Filter by incident type (hijacking, mugging, accident, all)
+   * @param {string} [options.timeRange='all'] - Filter by time range (24h, 7d, all)
+   * @param {number} [options.page=1] - Page number
+   * @param {number} [options.pageSize=20] - Items per page
+   * @returns {Promise<Object>} Object containing incidents array and pagination info
+   */
+  async getFeed(latitude, longitude, options = {}) {
+    try {
+      const {
+        radius = 5000,
+        type = 'all',
+        timeRange = 'all',
+        page = 1,
+        pageSize = 20,
+      } = options;
+
+      const response = await api.get('/incidents/feed', {
+        params: {
+          lat: latitude,
+          lng: longitude,
+          radius: radius,
+          type: type !== 'all' ? type : undefined,
+          time_range: timeRange,
+          page: page,
+          page_size: pageSize,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching incident feed:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
    * Verify/upvote an incident
    * @param {string} incidentId - The incident ID
    * @returns {Promise<Object>} The updated incident

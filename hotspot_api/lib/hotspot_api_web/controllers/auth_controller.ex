@@ -3,6 +3,7 @@ defmodule HotspotApiWeb.AuthController do
 
   alias HotspotApi.Accounts
   alias HotspotApi.Guardian
+  alias HotspotApi.Security
 
   action_fallback HotspotApiWeb.FallbackController
 
@@ -73,8 +74,46 @@ defmodule HotspotApiWeb.AuthController do
   Verifies the OTP code and returns a JWT token.
   """
   def verify_otp(conn, %{"phone_number" => phone_number, "code" => code}) do
+    # Check rate limit before attempting verification
+    case Security.check_login_rate_limit(phone_number) do
+      {:ok, :allowed} ->
+        verify_and_track(conn, phone_number, code)
+
+      {:error, :too_many_attempts, retry_after} ->
+        # Record failed attempt
+        Security.record_auth_attempt(%{
+          phone_number: phone_number,
+          ip_address: Security.get_ip_address(conn),
+          user_agent: get_user_agent(conn),
+          success: false,
+          failure_reason: "rate_limit_exceeded"
+        })
+
+        conn
+        |> put_resp_header("retry-after", to_string(retry_after))
+        |> put_status(:too_many_requests)
+        |> json(%{
+          error: %{
+            code: "too_many_attempts",
+            message: "Too many failed login attempts. Account locked for 15 minutes.",
+            retry_after: retry_after,
+            timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+          }
+        })
+    end
+  end
+
+  defp verify_and_track(conn, phone_number, code) do
     case Accounts.verify_otp(phone_number, code) do
       {:ok, user} ->
+        # Record successful attempt
+        Security.record_auth_attempt(%{
+          phone_number: phone_number,
+          ip_address: Security.get_ip_address(conn),
+          user_agent: get_user_agent(conn),
+          success: true
+        })
+
         {:ok, token, _claims} = Guardian.encode_and_sign(user, %{}, ttl: {90, :days})
 
         conn
@@ -91,6 +130,15 @@ defmodule HotspotApiWeb.AuthController do
         })
 
       {:error, :invalid_or_expired_otp} ->
+        # Record failed attempt
+        Security.record_auth_attempt(%{
+          phone_number: phone_number,
+          ip_address: Security.get_ip_address(conn),
+          user_agent: get_user_agent(conn),
+          success: false,
+          failure_reason: "invalid_otp"
+        })
+
         conn
         |> put_status(:unauthorized)
         |> json(%{
@@ -102,6 +150,14 @@ defmodule HotspotApiWeb.AuthController do
         })
 
       {:error, :too_many_attempts} ->
+        Security.record_auth_attempt(%{
+          phone_number: phone_number,
+          ip_address: Security.get_ip_address(conn),
+          user_agent: get_user_agent(conn),
+          success: false,
+          failure_reason: "too_many_otp_attempts"
+        })
+
         conn
         |> put_status(:unauthorized)
         |> json(%{
@@ -113,6 +169,14 @@ defmodule HotspotApiWeb.AuthController do
         })
 
       {:error, _reason} ->
+        Security.record_auth_attempt(%{
+          phone_number: phone_number,
+          ip_address: Security.get_ip_address(conn),
+          user_agent: get_user_agent(conn),
+          success: false,
+          failure_reason: "verification_error"
+        })
+
         conn
         |> put_status(:internal_server_error)
         |> json(%{
@@ -156,6 +220,13 @@ defmodule HotspotApiWeb.AuthController do
         premium_expires_at: user.premium_expires_at
       }
     })
+  end
+
+  defp get_user_agent(conn) do
+    case get_req_header(conn, "user-agent") do
+      [user_agent | _] -> user_agent
+      [] -> "unknown"
+    end
   end
 
   defp translate_errors(changeset) do

@@ -3,7 +3,7 @@ defmodule HotspotApiWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
-    plug CORSPlug
+    plug HotspotApiWeb.Plugs.SecurityPipeline
   end
 
   pipeline :auth do
@@ -35,6 +35,7 @@ defmodule HotspotApiWeb.Router do
     # Incident endpoints (without rate limiting for photo upload)
     post "/incidents/upload-photo", IncidentsController, :upload_photo
     get "/incidents/nearby", IncidentsController, :nearby
+    get "/incidents/feed", IncidentsController, :feed
   end
 
   scope "/api", HotspotApiWeb do
