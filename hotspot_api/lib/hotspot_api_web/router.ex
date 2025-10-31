@@ -23,6 +23,13 @@ defmodule HotspotApiWeb.Router do
     plug HotspotApiWeb.Plugs.ImageValidator
   end
 
+  # Health check endpoint (no auth required)
+  scope "/api", HotspotApiWeb do
+    pipe_through :api
+
+    get "/health", HealthController, :index
+  end
+
   # API v1 routes
   scope "/api/v1", HotspotApiWeb do
     pipe_through :api_v1

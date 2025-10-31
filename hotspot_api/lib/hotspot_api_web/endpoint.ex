@@ -42,7 +42,26 @@ defmodule HotspotApiWeb.Endpoint do
     param_key: "request_logger",
     cookie_key: "request_logger"
 
-  plug CORSPlug, origin: ["http://localhost:8081", "exp://localhost:8081"]
+  # CORS configuration - allow mobile app and admin portal
+  cors_origins =
+    case config_env() do
+      :prod ->
+        [
+          "https://hotspot.app",
+          "https://www.hotspot.app",
+          "https://admin.hotspot.app",
+          # Add your production mobile app schemes here
+          ~r/^https:\/\/.*\.hotspot\.app$/
+        ]
+      _ ->
+        [
+          "http://localhost:8081",
+          "exp://localhost:8081",
+          "http://localhost:3000"
+        ]
+    end
+
+  plug CORSPlug, origin: cors_origins
 
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
