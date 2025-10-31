@@ -23,6 +23,10 @@ defmodule HotspotApiWeb.Router do
     plug HotspotApiWeb.Plugs.ImageValidator
   end
 
+  pipeline :admin_auth do
+    plug HotspotApiWeb.Plugs.AdminAuthPipeline
+  end
+
   # Health check endpoint (no auth required)
   scope "/api", HotspotApiWeb do
     pipe_through :api
@@ -169,9 +173,20 @@ defmodule HotspotApiWeb.Router do
     post "/sync/reports", SyncController, :sync_reports
   end
 
-  # Admin routes (TODO: Add admin authentication pipeline)
-  scope "/api/v1/admin", HotspotApiWeb.Admin, as: :admin do
-    pipe_through :api_v1
+  # Admin authentication routes (no auth required)
+  scope "/api/admin", HotspotApiWeb.Admin, as: :admin do
+    pipe_through :api
+
+    post "/auth/login", AuthController, :login
+  end
+
+  # Admin protected routes
+  scope "/api/admin", HotspotApiWeb.Admin, as: :admin do
+    pipe_through [:api, :admin_auth]
+
+    # Auth endpoints
+    get "/auth/me", AuthController, :me
+    post "/auth/logout", AuthController, :logout
 
     # Moderation endpoints
     get "/moderation/flagged-content", ModerationController, :flagged_content

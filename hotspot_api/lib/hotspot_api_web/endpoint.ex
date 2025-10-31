@@ -44,7 +44,7 @@ defmodule HotspotApiWeb.Endpoint do
 
   # CORS configuration - allow mobile app and admin portal
   cors_origins =
-    case config_env() do
+    case Application.get_env(:hotspot_api, :env, :dev) do
       :prod ->
         [
           "https://hotspot.app",
