@@ -54,6 +54,18 @@ defmodule HotspotApiWeb.Router do
     # Moderation endpoints
     post "/moderation/validate-image", ModerationController, :validate_image
     post "/moderation/validate-text", ModerationController, :validate_text
+
+    # Geofence endpoints
+    get "/geofence/zones", GeofenceController, :index
+    get "/geofence/zones/:id", GeofenceController, :show
+    post "/geofence/check-location", GeofenceController, :check_location
+    get "/geofence/user-zones", GeofenceController, :user_zones
+
+    # Analytics endpoints
+    get "/analytics/hotspots", AnalyticsController, :hotspots
+    get "/analytics/time-patterns", AnalyticsController, :time_patterns
+    get "/analytics/trends", AnalyticsController, :trends
+    get "/analytics/summary", AnalyticsController, :summary
   end
 
   scope "/api/v1", HotspotApiWeb do
@@ -88,6 +100,14 @@ defmodule HotspotApiWeb.Router do
     put "/notifications/preferences", NotificationsController, :update_preferences
     post "/moderation/validate-image", ModerationController, :validate_image
     post "/moderation/validate-text", ModerationController, :validate_text
+    get "/geofence/zones", GeofenceController, :index
+    get "/geofence/zones/:id", GeofenceController, :show
+    post "/geofence/check-location", GeofenceController, :check_location
+    get "/geofence/user-zones", GeofenceController, :user_zones
+    get "/analytics/hotspots", AnalyticsController, :hotspots
+    get "/analytics/time-patterns", AnalyticsController, :time_patterns
+    get "/analytics/trends", AnalyticsController, :trends
+    get "/analytics/summary", AnalyticsController, :summary
   end
 
   scope "/api", HotspotApiWeb do

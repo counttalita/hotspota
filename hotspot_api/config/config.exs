@@ -47,7 +47,9 @@ config :hotspot_api, Oban,
     {Oban.Plugins.Cron,
      crontab: [
        # Run incident expiry worker every hour
-       {"0 * * * *", HotspotApi.Workers.IncidentExpiryWorker}
+       {"0 * * * *", HotspotApi.Workers.IncidentExpiryWorker},
+       # Run zone update worker every 10 minutes
+       {"*/10 * * * *", HotspotApi.Workers.ZoneUpdateWorker}
      ]}
   ],
   queues: [default: 10, zone_updates: 5, notifications: 20]

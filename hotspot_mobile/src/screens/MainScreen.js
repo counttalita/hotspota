@@ -3,6 +3,7 @@ import { StyleSheet, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MapScreen from './MapScreen';
 import IncidentFeedScreen from './IncidentFeedScreen';
+import AnalyticsScreen from './AnalyticsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -31,6 +32,14 @@ export default function MainScreen() {
         options={{
           tabBarIcon: ({ color }) => <TabIcon icon="📋" color={color} />,
           tabBarLabel: 'Feed',
+        }}
+      />
+      <Tab.Screen
+        name="Analytics"
+        component={AnalyticsScreen}
+        options={{
+          tabBarIcon: ({ color }) => <TabIcon icon="📊" color={color} />,
+          tabBarLabel: 'Analytics',
         }}
       />
     </Tab.Navigator>

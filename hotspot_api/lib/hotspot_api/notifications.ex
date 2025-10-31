@@ -117,6 +117,41 @@ defmodule HotspotApi.Notifications do
     end
   end
 
+  @doc """
+  Sends a push notification to a user.
+  This is a public wrapper for sending custom notifications (e.g., zone alerts).
+  """
+  def send_push_notification(user_id, %{title: title, body: body, data: data}) do
+    # Get user's FCM tokens
+    tokens = get_user_tokens(user_id)
+
+    if length(tokens) > 0 do
+      # Send to all user's devices
+      Task.start(fn ->
+        Enum.each(tokens, fn fcm_token ->
+          send_fcm_or_apns(fcm_token.token, fcm_token.platform, title, body, data)
+        end)
+      end)
+
+      {:ok, length(tokens)}
+    else
+      {:ok, 0}
+    end
+  end
+
+  # Send notification to FCM or APNS based on platform
+  defp send_fcm_or_apns(token, "ios", title, body, data) do
+    send_apns_notification(token, title, body, data)
+  end
+
+  defp send_fcm_or_apns(token, "android", title, body, data) do
+    send_fcm_notification(token, title, body, data)
+  end
+
+  defp send_fcm_or_apns(_token, _platform, _title, _body, _data) do
+    {:error, :invalid_platform}
+  end
+
   # Check if notification should be sent based on user preferences
   defp should_send_notification?(config, incident_type) do
     # Default to true if no config

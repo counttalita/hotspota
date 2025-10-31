@@ -23,6 +23,7 @@ const SettingsScreen = () => {
         mugging: true,
         accident: true,
       },
+      hotspot_zone_alerts: true,
     },
     is_premium: false,
   });
@@ -73,6 +74,16 @@ const SettingsScreen = () => {
           ...prev.notification_config.enabled_types,
           [type]: !prev.notification_config.enabled_types[type],
         },
+      },
+    }));
+  };
+
+  const toggleHotspotZoneAlerts = () => {
+    setPreferences((prev) => ({
+      ...prev,
+      notification_config: {
+        ...prev.notification_config,
+        hotspot_zone_alerts: !prev.notification_config.hotspot_zone_alerts,
       },
     }));
   };
@@ -144,6 +155,21 @@ const SettingsScreen = () => {
             value={preferences.notification_config.enabled_types.accident}
             onValueChange={() => toggleIncidentType('accident')}
             trackColor={{ false: '#D1D5DB', true: '#3B82F6' }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+
+        <View style={styles.settingRow}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingLabel}>🚨 Hotspot Zone Alerts</Text>
+            <Text style={styles.settingDescription}>
+              Get notified when entering high-risk areas
+            </Text>
+          </View>
+          <Switch
+            value={preferences.notification_config.hotspot_zone_alerts}
+            onValueChange={toggleHotspotZoneAlerts}
+            trackColor={{ false: '#D1D5DB', true: '#EF4444' }}
             thumbColor="#FFFFFF"
           />
         </View>

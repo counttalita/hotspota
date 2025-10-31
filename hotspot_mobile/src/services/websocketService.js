@@ -7,8 +7,13 @@ class WebSocketService {
   constructor() {
     this.socket = null;
     this.incidentChannel = null;
+    this.geofenceChannel = null;
     this.currentGeohash = null;
+    this.userId = null;
     this.onIncidentCallbacks = [];
+    this.onZoneEnteredCallbacks = [];
+    this.onZoneExitedCallbacks = [];
+    this.onZoneApproachingCallbacks = [];
   }
 
   /**
@@ -142,6 +147,146 @@ class WebSocketService {
   }
 
   /**
+   * Join geofence channel for zone entry/exit detection
+   */
+  async joinGeofenceChannel() {
+    if (!this.socket) {
+      console.warn('Socket not connected');
+      return;
+    }
+
+    // Get user ID from storage
+    const userDataStr = await AsyncStorage.getItem('user_data');
+    if (!userDataStr) {
+      console.warn('No user data found');
+      return;
+    }
+
+    const userData = JSON.parse(userDataStr);
+    this.userId = userData.id;
+
+    // Join geofence channel
+    this.geofenceChannel = this.socket.channel(`geofence:user:${this.userId}`, {});
+
+    // Handle zone entry events
+    this.geofenceChannel.on('zone:entered', (data) => {
+      console.log('Entered hotspot zone:', data);
+      this.notifyZoneEnteredCallbacks(data);
+    });
+
+    // Handle zone exit events
+    this.geofenceChannel.on('zone:exited', (data) => {
+      console.log('Exited hotspot zone:', data);
+      this.notifyZoneExitedCallbacks(data);
+    });
+
+    // Handle zone approaching events (premium users)
+    this.geofenceChannel.on('zone:approaching', (data) => {
+      console.log('Approaching hotspot zone:', data);
+      this.notifyZoneApproachingCallbacks(data);
+    });
+
+    this.geofenceChannel
+      .join()
+      .receive('ok', () => {
+        console.log('Joined geofence channel');
+      })
+      .receive('error', (resp) => {
+        console.error('Failed to join geofence channel:', resp);
+      });
+  }
+
+  /**
+   * Update location for geofence detection
+   */
+  updateGeofenceLocation(latitude, longitude) {
+    if (!this.geofenceChannel) {
+      return;
+    }
+
+    this.geofenceChannel
+      .push('location:update', { latitude, longitude })
+      .receive('ok', (resp) => {
+        console.log('Geofence location updated:', resp);
+      })
+      .receive('error', (resp) => {
+        console.error('Failed to update geofence location:', resp);
+      });
+  }
+
+  /**
+   * Subscribe to zone entered events
+   */
+  onZoneEntered(callback) {
+    this.onZoneEnteredCallbacks.push(callback);
+    
+    return () => {
+      this.onZoneEnteredCallbacks = this.onZoneEnteredCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
+   * Subscribe to zone exited events
+   */
+  onZoneExited(callback) {
+    this.onZoneExitedCallbacks.push(callback);
+    
+    return () => {
+      this.onZoneExitedCallbacks = this.onZoneExitedCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
+   * Subscribe to zone approaching events
+   */
+  onZoneApproaching(callback) {
+    this.onZoneApproachingCallbacks.push(callback);
+    
+    return () => {
+      this.onZoneApproachingCallbacks = this.onZoneApproachingCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  /**
+   * Notify callbacks about zone entry
+   */
+  notifyZoneEnteredCallbacks(data) {
+    this.onZoneEnteredCallbacks.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error('Error in zone entered callback:', error);
+      }
+    });
+  }
+
+  /**
+   * Notify callbacks about zone exit
+   */
+  notifyZoneExitedCallbacks(data) {
+    this.onZoneExitedCallbacks.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error('Error in zone exited callback:', error);
+      }
+    });
+  }
+
+  /**
+   * Notify callbacks about zone approaching
+   */
+  notifyZoneApproachingCallbacks(data) {
+    this.onZoneApproachingCallbacks.forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error('Error in zone approaching callback:', error);
+      }
+    });
+  }
+
+  /**
    * Disconnect from WebSocket
    */
   disconnect() {
@@ -150,13 +295,22 @@ class WebSocketService {
       this.incidentChannel = null;
     }
 
+    if (this.geofenceChannel) {
+      this.geofenceChannel.leave();
+      this.geofenceChannel = null;
+    }
+
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
 
     this.currentGeohash = null;
+    this.userId = null;
     this.onIncidentCallbacks = [];
+    this.onZoneEnteredCallbacks = [];
+    this.onZoneExitedCallbacks = [];
+    this.onZoneApproachingCallbacks = [];
   }
 }
 

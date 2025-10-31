@@ -12,8 +12,10 @@ import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
 import geohash from 'ngeohash';
 import { incidentService } from '../services/incidentService';
+import { geofenceService } from '../services/geofenceService';
 import websocketService from '../services/websocketService';
 import ReportIncidentModal from '../components/ReportIncidentModal';
+import HotspotZoneBanner from '../components/HotspotZoneBanner';
 
 const INCIDENT_COLORS = {
   hijacking: '#EF4444', // red
@@ -27,11 +29,27 @@ const HEAT_ZONE_COLORS = {
   accident: 'rgba(59, 130, 246, 0.3)', // blue with transparency
 };
 
+const HOTSPOT_ZONE_COLORS = {
+  low: 'rgba(251, 191, 36, 0.25)', // yellow
+  medium: 'rgba(251, 146, 60, 0.3)', // orange
+  high: 'rgba(239, 68, 68, 0.35)', // red
+  critical: 'rgba(220, 38, 38, 0.4)', // dark red
+};
+
+const HOTSPOT_ZONE_STROKE_COLORS = {
+  low: '#F59E0B',
+  medium: '#F97316',
+  high: '#EF4444',
+  critical: '#DC2626',
+};
+
 const MapScreen = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [incidents, setIncidents] = useState([]);
   const [heatZones, setHeatZones] = useState([]);
+  const [hotspotZones, setHotspotZones] = useState([]);
   const [showHeatZones, setShowHeatZones] = useState(true);
+  const [showHotspotZones, setShowHotspotZones] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [loading, setLoading] = useState(true);
   const [locationPermission, setLocationPermission] = useState(false);
@@ -39,7 +57,9 @@ const MapScreen = () => {
   const [isOnline, setIsOnline] = useState(true);
   const [verifyingIncident, setVerifyingIncident] = useState(false);
   const [verifiedIncidents, setVerifiedIncidents] = useState(new Set());
+  const [zoneAlert, setZoneAlert] = useState(null);
   const mapRef = useRef(null);
+  const locationWatchRef = useRef(null);
 
   useEffect(() => {
     requestLocationPermission();
@@ -49,6 +69,11 @@ const MapScreen = () => {
     // Cleanup on unmount
     return () => {
       websocketService.disconnect();
+      
+      // Stop location tracking
+      if (locationWatchRef.current) {
+        locationWatchRef.current.remove();
+      }
     };
   }, []);
 
@@ -56,6 +81,7 @@ const MapScreen = () => {
     if (userLocation) {
       fetchNearbyIncidents();
       fetchHeatmapData();
+      fetchHotspotZones();
       updateWebSocketLocation(userLocation);
     }
   }, [userLocation]);
@@ -69,6 +95,27 @@ const MapScreen = () => {
         websocketService.onNewIncident((incident) => {
           handleNewIncidentFromWebSocket(incident);
         });
+
+        // Join geofence channel for zone alerts
+        await websocketService.joinGeofenceChannel();
+
+        // Subscribe to zone entry events
+        websocketService.onZoneEntered((data) => {
+          handleZoneEntered(data);
+        });
+
+        // Subscribe to zone exit events
+        websocketService.onZoneExited((data) => {
+          handleZoneExited(data);
+        });
+
+        // Subscribe to zone approaching events (premium users)
+        websocketService.onZoneApproaching((data) => {
+          handleZoneApproaching(data);
+        });
+
+        // Start background location tracking
+        startBackgroundLocationTracking();
       }
     } catch (error) {
       console.error('Failed to initialize WebSocket:', error);
@@ -226,6 +273,114 @@ const MapScreen = () => {
     }
   };
 
+  const fetchHotspotZones = async () => {
+    if (!isOnline) return;
+
+    try {
+      const zones = await geofenceService.getZones();
+      setHotspotZones(zones || []);
+    } catch (error) {
+      console.error('Error fetching hotspot zones:', error);
+      // Don't show alert for zone errors - it's not critical
+    }
+  };
+
+  const startBackgroundLocationTracking = async () => {
+    try {
+      // Request background location permission
+      const { status } = await Location.requestBackgroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        console.warn('Background location permission not granted');
+        return;
+      }
+
+      // Start watching location with high accuracy
+      locationWatchRef.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 10000, // Update every 10 seconds
+          distanceInterval: 50, // Or when user moves 50 meters
+        },
+        (location) => {
+          const coords = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+
+          // Update user location state
+          setUserLocation(coords);
+
+          // Send location update to geofence channel
+          websocketService.updateGeofenceLocation(coords.latitude, coords.longitude);
+        }
+      );
+    } catch (error) {
+      console.error('Error starting background location tracking:', error);
+    }
+  };
+
+  const handleZoneEntered = (data) => {
+    console.log('Entered hotspot zone:', data);
+    
+    // Show zone alert banner
+    setZoneAlert({
+      zone: data,
+      action: 'entered',
+    });
+
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+      setZoneAlert(null);
+    }, 10000);
+
+    // Show system alert
+    Alert.alert(
+      'Hotspot Zone Alert',
+      data.message,
+      [{ text: 'OK' }],
+      { cancelable: true }
+    );
+  };
+
+  const handleZoneExited = (data) => {
+    console.log('Exited hotspot zone:', data);
+    
+    // Show brief exit notification
+    setZoneAlert({
+      zone: data,
+      action: 'exited',
+    });
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      setZoneAlert(null);
+    }, 5000);
+  };
+
+  const handleZoneApproaching = (data) => {
+    console.log('Approaching hotspot zone:', data);
+    
+    // Show approaching alert (premium feature)
+    setZoneAlert({
+      zone: data,
+      action: 'approaching',
+    });
+
+    // Auto-dismiss after 8 seconds
+    setTimeout(() => {
+      setZoneAlert(null);
+    }, 8000);
+
+    // Show system alert
+    Alert.alert(
+      'Approaching Hotspot Zone',
+      data.message,
+      [{ text: 'OK' }],
+      { cancelable: true }
+    );
+  };
+
   const centerOnUserLocation = () => {
     if (userLocation && mapRef.current) {
       mapRef.current.animateToRegion({
@@ -273,6 +428,10 @@ const MapScreen = () => {
 
   const toggleHeatZones = () => {
     setShowHeatZones(prev => !prev);
+  };
+
+  const toggleHotspotZones = () => {
+    setShowHotspotZones(prev => !prev);
   };
 
   const handleVerifyIncident = async (incidentId) => {
@@ -366,7 +525,22 @@ const MapScreen = () => {
         showsUserLocation={true}
         showsMyLocationButton={false}
       >
-        {/* Heat zones - render first so they appear below markers */}
+        {/* Hotspot zones - render first (geofenced areas) */}
+        {showHotspotZones && hotspotZones.map((zone) => (
+          <Circle
+            key={`hotspot-zone-${zone.id}`}
+            center={{
+              latitude: zone.center.latitude,
+              longitude: zone.center.longitude,
+            }}
+            radius={zone.radius_meters}
+            fillColor={HOTSPOT_ZONE_COLORS[zone.risk_level] || 'rgba(128, 128, 128, 0.25)'}
+            strokeColor={HOTSPOT_ZONE_STROKE_COLORS[zone.risk_level] || '#808080'}
+            strokeWidth={3}
+          />
+        ))}
+
+        {/* Heat zones - render second */}
         {showHeatZones && heatZones.map((zone, index) => (
           <Circle
             key={`heat-zone-${index}`}
@@ -394,6 +568,28 @@ const MapScreen = () => {
           />
         ))}
       </MapView>
+
+      {/* Hotspot zone alert banner */}
+      {zoneAlert && (
+        <HotspotZoneBanner
+          zone={zoneAlert.zone}
+          action={zoneAlert.action}
+          onDismiss={() => setZoneAlert(null)}
+        />
+      )}
+
+      {/* Hotspot zones toggle button */}
+      <TouchableOpacity
+        style={[styles.hotspotZoneToggle, showHotspotZones && styles.hotspotZoneToggleActive]}
+        onPress={toggleHotspotZones}
+      >
+        <Text style={styles.hotspotZoneToggleText}>
+          {showHotspotZones ? '🚨' : '🚨'}
+        </Text>
+        <Text style={[styles.hotspotZoneToggleLabel, showHotspotZones && styles.hotspotZoneToggleLabelActive]}>
+          Hotspot Zones
+        </Text>
+      </TouchableOpacity>
 
       {/* Heat zones toggle button */}
       <TouchableOpacity
@@ -581,9 +777,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  heatZoneToggle: {
+  hotspotZoneToggle: {
     position: 'absolute',
     top: 60,
+    right: 20,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  hotspotZoneToggleActive: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#EF4444',
+  },
+  hotspotZoneToggleText: {
+    fontSize: 18,
+    marginRight: 6,
+  },
+  hotspotZoneToggleLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  hotspotZoneToggleLabelActive: {
+    color: '#991B1B',
+  },
+  heatZoneToggle: {
+    position: 'absolute',
+    top: 110,
     right: 20,
     backgroundColor: '#fff',
     paddingHorizontal: 12,
