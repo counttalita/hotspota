@@ -1,73 +1,166 @@
-# React + TypeScript + Vite
+# Hotspot Admin Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Web-based administration portal for the Hotspot safety reporting platform. Built with React, TypeScript, Vite, and TailwindCSS.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 📊 **Dashboard**: Real-time statistics and activity monitoring
+- 🚨 **Incident Management**: Review, moderate, and manage incident reports
+- 👥 **User Management**: Manage user accounts, subscriptions, and permissions
+- 🗺️ **Zone Management**: Create and manage hotspot zones
+- 📈 **Analytics**: Comprehensive analytics and reporting
+- 🤝 **Partner Management**: Manage partner sponsorships and branded alerts
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React 19** - UI framework
+- **TypeScript** - Type safety
+- **Vite** - Build tool and dev server
+- **TailwindCSS** - Utility-first CSS
+- **shadcn/ui** - Accessible component library
+- **React Router** - Client-side routing
+- **TanStack Query** - Server state management
+- **Zustand** - Client state management
+- **Recharts** - Data visualization
+- **MapLibre GL** - Interactive maps
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js 20.11.0 or higher
+- npm or yarn
+- Backend API running (see `hotspot_api` directory)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Install dependencies
+npm install
+
+# Copy environment variables
+cp .env.example .env
+
+# Update .env with your backend API URL
+# VITE_API_URL=http://localhost:4000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+# Start development server
+npm run dev
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Open browser to http://localhost:5173
 ```
+
+### Building for Production
+
+```bash
+# Build production bundle
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### Linting
+
+```bash
+# Run ESLint
+npm run lint
+```
+
+## Project Structure
+
+```
+hotspot_admin/
+├── src/
+│   ├── components/       # Reusable UI components
+│   │   ├── layout/      # Layout components (Header, Sidebar)
+│   │   └── ui/          # shadcn/ui components
+│   ├── pages/           # Page components
+│   │   ├── DashboardPage.tsx
+│   │   ├── IncidentsPage.tsx
+│   │   ├── UsersPage.tsx
+│   │   ├── ZonesPage.tsx
+│   │   ├── AnalyticsPage.tsx
+│   │   └── PartnersPage.tsx
+│   ├── lib/             # Utilities and helpers
+│   │   ├── api.ts       # API client
+│   │   └── utils.ts     # Helper functions
+│   ├── stores/          # Zustand stores
+│   │   └── authStore.ts # Authentication state
+│   ├── App.tsx          # Main app component
+│   └── main.tsx         # Entry point
+├── public/              # Static assets
+├── .env.example         # Environment variables template
+├── .env.production      # Production environment variables
+├── render.yaml          # Render deployment configuration
+├── DEPLOYMENT.md        # Deployment guide
+└── DEPLOYMENT_CHECKLIST.md  # Deployment checklist
+```
+
+## Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `VITE_API_URL` | Backend API URL | `http://localhost:4000` |
+
+## Deployment
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+
+### Quick Deploy to Render
+
+1. Push code to GitHub
+2. Create new Static Site on Render
+3. Connect GitHub repository
+4. Configure build settings:
+   - Root Directory: `hotspot_admin`
+   - Build Command: `npm install && npm run build`
+   - Publish Directory: `dist`
+5. Add environment variable: `VITE_API_URL`
+6. Deploy!
+
+## Admin User Roles
+
+- **Super Admin**: Full access to all features
+- **Moderator**: Incident and content moderation
+- **Analyst**: Analytics and reporting
+- **Partner Manager**: Partner management
+
+## Security
+
+- HTTPS enforced in production
+- JWT-based authentication
+- Rate limiting on API endpoints
+- CORS configured for admin portal origin
+- Security headers enabled
+- XSS and CSRF protection
+
+## Browser Support
+
+- Chrome (latest)
+- Firefox (latest)
+- Safari (latest)
+- Edge (latest)
+
+## Contributing
+
+1. Create a feature branch
+2. Make your changes
+3. Run linter: `npm run lint`
+4. Build and test: `npm run build`
+5. Submit pull request
+
+## License
+
+Proprietary - All rights reserved
+
+## Support
+
+For issues or questions:
+- Create an issue in the repository
+- Contact the development team
+- Check the deployment guide for troubleshooting

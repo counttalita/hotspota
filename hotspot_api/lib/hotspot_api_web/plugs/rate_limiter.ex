@@ -1,122 +1,85 @@
 defmodule HotspotApiWeb.Plugs.RateLimiter do
   @moduledoc """
-  Rate limiting plug using Hammer.
-  Prevents abuse by limiting requests per user or IP address.
-  """
+  Rate limiting plug to protect API endpoints from abuse.
 
-  import Plug.Conn
-  import Phoenix.Controller, only: [json: 2]
+  Uses Hammer library for distributed rate limiting with ETS backend.
+  For production with multiple nodes, configure Redis backend.
 
-  @doc """
-  Rate limits incident creation to 5 per hour per user.
-  """
-  def init(opts), do: opts
+  ## Usage
 
-  def call(conn, _opts) do
-    check_incident_rate_limit(conn, [])
-  end
-
-  def check_incident_rate_limit(conn, _opts) do
-    user_id = get_user_id(conn)
-
-    if user_id do
-      case Hammer.check_rate("incident:#{user_id}", 60_000 * 60, 5) do
-        {:allow, _count} ->
-          conn
-
-        {:deny, limit} ->
-          conn
-          |> put_status(:too_many_requests)
-          |> json(%{
-            error: "Rate limit exceeded",
-            message: "You can only create #{limit} incidents per hour. Please try again later.",
-            retry_after: 3600
-          })
-          |> halt()
+      # In router.ex
+      pipeline :admin_api do
+        plug :accepts, ["json"]
+        plug HotspotApiWeb.Plugs.RateLimiter, limit: 100, window_ms: 60_000
       end
-    else
-      conn
-    end
-  end
 
-  defp get_user_id(conn) do
-    case conn.assigns[:current_user] do
-      nil -> nil
-      user -> user.id
-    end
-  end
+  ## Options
 
-  @doc """
-  Rate limits API requests to 100 per minute per IP.
+    * `:limit` - Maximum number of requests allowed (default: 100)
+    * `:window_ms` - Time window in milliseconds (default: 60_000 = 1 minute)
+    * `:identifier` - Function to identify the requester (default: uses IP or user ID)
+
   """
-  def check_api_rate_limit(conn, _opts) do
-    ip_address = HotspotApi.Security.get_ip_address(conn)
+  import Plug.Conn
+  import Phoenix.Controller
+  require Logger
 
-    case Hammer.check_rate("api:#{ip_address}", 60_000, 100) do
-      {:allow, _count} ->
+  def init(opts) do
+    %{
+      limit: Keyword.get(opts, :limit, 100),
+      window_ms: Keyword.get(opts, :window_ms, 60_000),
+      identifier_fn: Keyword.get(opts, :identifier, &default_identifier/1)
+    }
+  end
+
+  def call(conn, opts) do
+    identifier = opts.identifier_fn.(conn)
+    key = "rate_limit:#{identifier}"
+
+    case Hammer.check_rate(key, opts.window_ms, opts.limit) do
+      {:allow, count} ->
         conn
+        |> put_resp_header("x-ratelimit-limit", to_string(opts.limit))
+        |> put_resp_header("x-ratelimit-remaining", to_string(opts.limit - count))
+        |> put_resp_header("x-ratelimit-reset", to_string(get_reset_time(opts.window_ms)))
 
       {:deny, _limit} ->
+        Logger.warning("Rate limit exceeded for #{identifier}")
+
         conn
         |> put_status(:too_many_requests)
+        |> put_resp_header("retry-after", to_string(div(opts.window_ms, 1000)))
         |> json(%{
           error: "Rate limit exceeded",
-          message: "Too many requests. Please slow down.",
-          retry_after: 60
+          message: "Too many requests. Please try again later.",
+          retry_after_seconds: div(opts.window_ms, 1000)
         })
         |> halt()
     end
   end
 
-  @doc """
-  Rate limits OTP requests to 3 per hour per phone number.
-  """
-  def check_otp_rate_limit(conn, _opts) do
-    phone_number = conn.params["phone_number"]
-
-    if phone_number do
-      case Hammer.check_rate("otp:#{phone_number}", 60_000 * 60, 3) do
-        {:allow, _count} ->
-          conn
-
-        {:deny, _limit} ->
-          conn
-          |> put_status(:too_many_requests)
-          |> json(%{
-            error: "Rate limit exceeded",
-            message: "Too many OTP requests. Please try again in 1 hour.",
-            retry_after: 3600
-          })
-          |> halt()
-      end
-    else
-      conn
+  # Default identifier: use authenticated user ID or IP address
+  defp default_identifier(conn) do
+    case Guardian.Plug.current_resource(conn) do
+      nil -> "ip:#{get_ip_address(conn)}"
+      %{id: user_id} -> "user:#{user_id}"
     end
   end
 
-  @doc """
-  Rate limits verification attempts to 10 per hour per user.
-  """
-  def check_verification_rate_limit(conn, _opts) do
-    user_id = get_user_id(conn)
-
-    if user_id do
-      case Hammer.check_rate("verification:#{user_id}", 60_000 * 60, 10) do
-        {:allow, _count} ->
-          conn
-
-        {:deny, _limit} ->
-          conn
-          |> put_status(:too_many_requests)
-          |> json(%{
-            error: "Rate limit exceeded",
-            message: "Too many verification attempts. Please try again later.",
-            retry_after: 3600
-          })
-          |> halt()
-      end
-    else
-      conn
+  defp get_ip_address(conn) do
+    # Handle X-Forwarded-For header for proxies (Render, Fly.io, etc.)
+    case get_req_header(conn, "x-forwarded-for") do
+      [ip | _] ->
+        # Take first IP in the chain
+        ip |> String.split(",") |> List.first() |> String.trim()
+      [] ->
+        # Fallback to remote_ip
+        conn.remote_ip |> :inet.ntoa() |> to_string()
     end
+  end
+
+  defp get_reset_time(window_ms) do
+    # Calculate when the rate limit window resets
+    System.system_time(:second) + div(window_ms, 1000)
   end
 end

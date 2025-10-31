@@ -1,0 +1,69 @@
+name: Deploy Admin Portal to Render
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'hotspot_admin/**'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: hotspot_admin
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.11.0'
+          cache: 'npm'
+          cache-dependency-path: hotspot_admin/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter
+        run: npm run lint
+      
+      - name: Build production bundle
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+      
+      - name: Check build output
+        run: |
+          echo "Build completed successfully"
+          ls -lh dist/
+          du -sh dist/
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-portal-build
+          path: hotspot_admin/dist/
+          retention-days: 7
+  
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Trigger Render deployment
+        run: |
+          echo "Render will automatically deploy from GitHub"
+          echo "No manual trigger needed - deployment happens on push to main"
+      
+      - name: Deployment notification
+        run: |
+          echo "✅ Admin portal deployment initiated"
+          echo "🔗 Check status at: https://dashboard.render.com"
+          echo "📦 Build artifacts available in GitHub Actions"

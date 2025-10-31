@@ -27,6 +27,10 @@ defmodule HotspotApiWeb.Router do
     plug HotspotApiWeb.Plugs.AdminAuthPipeline
   end
 
+  pipeline :admin_rate_limit do
+    plug HotspotApiWeb.Plugs.RateLimiter, limit: 100, window_ms: 60_000
+  end
+
   # Health check endpoint (no auth required)
   scope "/api", HotspotApiWeb do
     pipe_through :api
@@ -182,7 +186,7 @@ defmodule HotspotApiWeb.Router do
 
   # Admin protected routes
   scope "/api/admin", HotspotApiWeb.Admin, as: :admin do
-    pipe_through [:api, :admin_auth]
+    pipe_through [:api, :admin_auth, :admin_rate_limit]
 
     # Auth endpoints
     get "/auth/me", AuthController, :me

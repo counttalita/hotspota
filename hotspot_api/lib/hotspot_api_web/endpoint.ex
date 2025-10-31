@@ -50,14 +50,17 @@ defmodule HotspotApiWeb.Endpoint do
           "https://hotspot.app",
           "https://www.hotspot.app",
           "https://admin.hotspot.app",
+          "https://hotspot-admin.onrender.com",
           # Add your production mobile app schemes here
-          ~r/^https:\/\/.*\.hotspot\.app$/
+          ~r/^https:\/\/.*\.hotspot\.app$/,
+          ~r/^https:\/\/.*\.onrender\.com$/
         ]
       _ ->
         [
           "http://localhost:8081",
           "exp://localhost:8081",
-          "http://localhost:3000"
+          "http://localhost:3000",
+          "http://localhost:5173"
         ]
     end
 
