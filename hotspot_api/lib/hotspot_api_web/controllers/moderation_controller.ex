@@ -4,7 +4,7 @@ defmodule HotspotApiWeb.ModerationController do
   alias HotspotApi.Moderation
   alias HotspotApi.Security
 
-  action_fallback HotspotApiWeb.FallbackController
+  action_fallback(HotspotApiWeb.FallbackController)
 
   @doc """
   Validates an image before upload.
@@ -78,10 +78,12 @@ defmodule HotspotApiWeb.ModerationController do
 
       {:error, :hate_speech_detected, message} ->
         # Log security event
-        user_id = case conn.assigns[:current_user] do
-          nil -> nil
-          user -> user.id
-        end
+        user_id =
+          case conn.assigns[:current_user] do
+            nil -> nil
+            user -> user.id
+          end
+
         ip_address = Security.get_ip_address(conn)
 
         Security.log_event(%{

@@ -9,6 +9,8 @@ config :hotspot_api, HotspotApi.Repo,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10,
+  queue_target: 50,
+  queue_interval: 1000,
   types: HotspotApi.PostgresTypes
 
 # For development, we disable any cache and enable
@@ -86,3 +88,10 @@ config :hammer,
 config :hotspot_api,
   fcm_server_key: System.get_env("FCM_SERVER_KEY"),
   apns_mode: :dev
+
+# Security configuration
+config :hotspot_api,
+  # AbuseIPDB API key for threat intelligence (optional)
+  abuseipdb_api_key: System.get_env("ABUSEIPDB_API_KEY"),
+  # Security alert email
+  security_alert_email: System.get_env("SECURITY_ALERT_EMAIL") || "security@hotspot.app"

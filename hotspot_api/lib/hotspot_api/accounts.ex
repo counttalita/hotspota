@@ -6,7 +6,7 @@ defmodule HotspotApi.Accounts do
   import Ecto.Query, warn: false
   alias HotspotApi.Repo
 
-  alias HotspotApi.Accounts.{User, OtpCode}
+  alias HotspotApi.Accounts.{User, OtpCode, AdminUser, AdminAuditLog}
 
   @doc """
   Returns the list of users.
@@ -126,8 +126,8 @@ defmodule HotspotApi.Accounts do
     if recent_otps_count >= 3 do
       {:error, :rate_limit_exceeded}
     else
-      # Generate 6-digit OTP
-      code = :rand.uniform(999_999) |> Integer.to_string() |> String.pad_leading(6, "0")
+      # Generate 6-digit OTP using secure random
+      code = generate_secure_otp()
       expires_at = DateTime.utc_now() |> DateTime.add(600, :second) # 10 minutes
 
       # Create OTP record
@@ -203,6 +203,13 @@ defmodule HotspotApi.Accounts do
     end
   end
 
+  defp generate_secure_otp do
+    # Use cryptographically secure random number generation
+    <<a::32, b::32, c::32>> = :crypto.strong_rand_bytes(12)
+    code = rem(abs(a + b + c), 1_000_000)
+    code |> Integer.to_string() |> String.pad_leading(6, "0")
+  end
+
   defp send_twilio_sms(phone_number, code) do
     twilio_account_sid = Application.get_env(:hotspot_api, :twilio_account_sid)
     twilio_auth_token = Application.get_env(:hotspot_api, :twilio_auth_token)
@@ -242,6 +249,129 @@ defmodule HotspotApi.Accounts do
           {:error, :twilio_error}
       end
     end
+  end
+
+  ## Admin Users
+
+  @doc """
+  Lists all admin users.
+  """
+  def list_admin_users do
+    Repo.all(AdminUser)
+  end
+
+  @doc """
+  Gets a single admin user by ID.
+  """
+  def get_admin_user!(id), do: Repo.get!(AdminUser, id)
+
+  @doc """
+  Gets an admin user by email.
+  """
+  def get_admin_user_by_email(email) do
+    Repo.get_by(AdminUser, email: email)
+  end
+
+  @doc """
+  Creates an admin user with password hashing.
+  """
+  def create_admin_user(attrs) do
+    %AdminUser{}
+    |> AdminUser.registration_changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates an admin user.
+  """
+  def update_admin_user(%AdminUser{} = admin_user, attrs) do
+    admin_user
+    |> AdminUser.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Updates admin user password.
+  """
+  def update_admin_password(%AdminUser{} = admin_user, password) do
+    admin_user
+    |> AdminUser.registration_changeset(%{password: password})
+    |> Repo.update()
+  end
+
+  @doc """
+  Authenticates an admin user with email and password.
+  Returns {:ok, admin_user} if successful, {:error, reason} otherwise.
+  """
+  def authenticate_admin(email, password) do
+    admin_user = get_admin_user_by_email(email)
+
+    cond do
+      is_nil(admin_user) ->
+        # Run password hash to prevent timing attacks
+        Argon2.no_user_verify()
+        {:error, :invalid_credentials}
+
+      not admin_user.is_active ->
+        {:error, :account_inactive}
+
+      AdminUser.verify_password(admin_user, password) ->
+        # Update last login
+        update_admin_user(admin_user, %{last_login_at: DateTime.utc_now()})
+        {:ok, admin_user}
+
+      true ->
+        {:error, :invalid_credentials}
+    end
+  end
+
+  @doc """
+  Deactivates an admin user account.
+  """
+  def deactivate_admin_user(%AdminUser{} = admin_user) do
+    update_admin_user(admin_user, %{is_active: false})
+  end
+
+  ## Admin Audit Logs
+
+  @doc """
+  Creates an audit log entry for admin actions.
+  """
+  def create_audit_log(attrs) do
+    %AdminAuditLog{}
+    |> AdminAuditLog.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Lists audit logs with optional filters.
+  """
+  def list_audit_logs(filters \\ %{}) do
+    AdminAuditLog
+    |> apply_audit_log_filters(filters)
+    |> order_by([a], desc: a.inserted_at)
+    |> limit(100)
+    |> Repo.all()
+    |> Repo.preload(:admin_user)
+  end
+
+  defp apply_audit_log_filters(query, filters) do
+    Enum.reduce(filters, query, fn
+      {:admin_user_id, admin_user_id}, query ->
+        where(query, [a], a.admin_user_id == ^admin_user_id)
+
+      {:action, action}, query ->
+        where(query, [a], a.action == ^action)
+
+      {:resource_type, resource_type}, query ->
+        where(query, [a], a.resource_type == ^resource_type)
+
+      {:resource_id, resource_id}, query ->
+        where(query, [a], a.resource_id == ^resource_id)
+
+      _, query ->
+        query
+    end)
   end
 
 end

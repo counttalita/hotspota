@@ -10,15 +10,67 @@ defmodule HotspotApi.Security do
   ## IP Blocklist
 
   @doc """
-  Checks if an IP address is blocked.
+  Checks if an IP address is blocked (local blocklist or threat intelligence).
   """
   def ip_blocked?(ip_address) when is_binary(ip_address) do
+    local_blocked?(ip_address) or threat_intel_blocked?(ip_address)
+  end
+
+  defp local_blocked?(ip_address) do
     query =
       from b in IPBlocklist,
         where: b.ip_address == ^ip_address,
         where: b.is_permanent == true or b.expires_at > ^DateTime.utc_now()
 
     Repo.exists?(query)
+  end
+
+  defp threat_intel_blocked?(ip_address) do
+    # Check AbuseIPDB or similar threat intelligence feed
+    # Only check if API key is configured
+    api_key = Application.get_env(:hotspot_api, :abuseipdb_api_key)
+
+    if api_key do
+      check_abuseipdb(ip_address, api_key)
+    else
+      false
+    end
+  end
+
+  defp check_abuseipdb(ip_address, api_key) do
+    url = "https://api.abuseipdb.com/api/v2/check"
+
+    headers = [
+      {"Key", api_key},
+      {"Accept", "application/json"}
+    ]
+
+    params = URI.encode_query(%{
+      "ipAddress" => ip_address,
+      "maxAgeInDays" => "90"
+    })
+
+    case HTTPoison.get("#{url}?#{params}", headers, recv_timeout: 5000) do
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        case Jason.decode(body) do
+          {:ok, %{"data" => %{"abuseConfidenceScore" => score}}} when score > 75 ->
+            # High abuse score - block this IP
+            log_event(%{
+              event_type: "threat_intel_block",
+              ip_address: ip_address,
+              details: %{source: "abuseipdb", score: score},
+              severity: "high"
+            })
+            true
+
+          _ ->
+            false
+        end
+
+      _ ->
+        # If API call fails, don't block (fail open)
+        false
+    end
   end
 
   @doc """
@@ -195,7 +247,7 @@ defmodule HotspotApi.Security do
 
   defp create_alert_and_block(conn, ip_address, attack_type, severity, _user_id) do
     # Create intrusion alert
-    create_intrusion_alert(%{
+    {:ok, alert} = create_intrusion_alert(%{
       ip_address: ip_address,
       attack_type: attack_type,
       request_path: conn.request_path,
@@ -207,7 +259,45 @@ defmodule HotspotApi.Security do
     # Block IP for 1 hour
     block_ip(ip_address, "Automatic block: #{attack_type}", duration_seconds: 3600)
 
+    # Send email notification for high/critical severity
+    if severity in ["high", "critical"] do
+      send_intrusion_alert_email(alert)
+    end
+
     {:blocked, attack_type}
+  end
+
+  defp send_intrusion_alert_email(alert) do
+    # Get security team email from config
+    security_email = Application.get_env(:hotspot_api, :security_alert_email)
+
+    if security_email do
+      # Use Swoosh to send email
+      alias Swoosh.Email
+
+      email =
+        Email.new()
+        |> Email.to(security_email)
+        |> Email.from({"Hotspot Security", "security@hotspot.app"})
+        |> Email.subject("[#{String.upcase(alert.severity)}] Security Alert: #{alert.attack_type}")
+        |> Email.text_body("""
+        Security Alert Detected
+
+        Severity: #{alert.severity}
+        Attack Type: #{alert.attack_type}
+        IP Address: #{alert.ip_address}
+        Request Path: #{alert.request_path}
+        Timestamp: #{alert.created_at}
+        Auto-Blocked: #{alert.auto_blocked}
+
+        Request Parameters:
+        #{inspect(alert.request_params, pretty: true)}
+
+        This IP has been automatically blocked for 1 hour.
+        """)
+
+      HotspotApi.Mailer.deliver(email)
+    end
   end
 
   @doc """
@@ -215,8 +305,16 @@ defmodule HotspotApi.Security do
   """
   def get_ip_address(conn) do
     case Plug.Conn.get_req_header(conn, "x-forwarded-for") do
-      [ip | _] -> ip
-      [] -> to_string(:inet.ntoa(conn.remote_ip))
+      [forwarded | _] ->
+        # X-Forwarded-For can contain multiple IPs separated by commas
+        # The first IP is the original client IP
+        forwarded
+        |> String.split(",")
+        |> List.first()
+        |> String.trim()
+
+      [] ->
+        to_string(:inet.ntoa(conn.remote_ip))
     end
   end
 

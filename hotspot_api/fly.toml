@@ -1,0 +1,82 @@
+# Fly.io deployment configuration for Hotspot API
+app = "hotspot-api"
+primary_region = "jnb" # Johannesburg, South Africa
+
+[build]
+  [build.args]
+    ELIXIR_VERSION = "1.15"
+    OTP_VERSION = "26"
+
+[env]
+  PHX_HOST = "hotspot-api.fly.dev"
+  PORT = "8080"
+  ECTO_IPV6 = "true"
+  MIX_ENV = "prod"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 2
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 1000
+    soft_limit = 500
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/v1/health"
+
+# Security: TLS configuration
+[[services]]
+  protocol = "tcp"
+  internal_port = 8080
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 1000
+    soft_limit = 500
+
+# Database connection
+[[statics]]
+  guest_path = "/app/priv/static"
+  url_prefix = "/static"
+
+# VM resources
+[vm]
+  cpu_kind = "shared"
+  cpus = 2
+  memory_mb = 2048
+
+# Metrics and monitoring
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+# Deploy configuration
+[deploy]
+  release_command = "/app/bin/migrate"
+  strategy = "rolling"
+
+# Health checks
+[[checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/api/v1/health"

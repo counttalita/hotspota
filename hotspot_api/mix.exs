@@ -70,7 +70,11 @@ defmodule HotspotApi.MixProject do
       # Geohash for location-based channels
       {:geohash, "~> 1.3"},
       # Push notifications
-      {:pigeon, "~> 2.0"}
+      {:pigeon, "~> 2.0"},
+      # Password hashing
+      {:argon2_elixir, "~> 4.0"},
+      # Dependency vulnerability scanning
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
   end
 

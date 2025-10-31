@@ -3,7 +3,12 @@ defmodule HotspotApiWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug HotspotApiWeb.Plugs.RequestLogger
     plug HotspotApiWeb.Plugs.SecurityPipeline
+  end
+
+  pipeline :api_v1 do
+    plug :api
   end
 
   pipeline :auth do
@@ -18,16 +23,17 @@ defmodule HotspotApiWeb.Router do
     plug HotspotApiWeb.Plugs.ImageValidator
   end
 
-  scope "/api", HotspotApiWeb do
-    pipe_through :api
+  # API v1 routes
+  scope "/api/v1", HotspotApiWeb do
+    pipe_through :api_v1
 
     # Public auth endpoints
     post "/auth/send-otp", AuthController, :send_otp
     post "/auth/verify-otp", AuthController, :verify_otp
   end
 
-  scope "/api", HotspotApiWeb do
-    pipe_through [:api, :auth]
+  scope "/api/v1", HotspotApiWeb do
+    pipe_through [:api_v1, :auth]
 
     # Protected endpoints
     get "/auth/me", AuthController, :me
@@ -49,16 +55,47 @@ defmodule HotspotApiWeb.Router do
     post "/moderation/validate-text", ModerationController, :validate_text
   end
 
-  scope "/api", HotspotApiWeb do
-    pipe_through [:api, :auth, :rate_limit_incident]
+  scope "/api/v1", HotspotApiWeb do
+    pipe_through [:api_v1, :auth, :rate_limit_incident]
 
     # Rate-limited incident creation
     post "/incidents", IncidentsController, :create
   end
 
-  # Admin routes (TODO: Add admin authentication pipeline)
-  scope "/api/admin", HotspotApiWeb.Admin, as: :admin do
+  # Legacy API routes (redirect to v1)
+  scope "/api", HotspotApiWeb do
     pipe_through :api
+
+    # Public auth endpoints
+    post "/auth/send-otp", AuthController, :send_otp
+    post "/auth/verify-otp", AuthController, :verify_otp
+  end
+
+  scope "/api", HotspotApiWeb do
+    pipe_through [:api, :auth]
+
+    # Protected endpoints
+    get "/auth/me", AuthController, :me
+    post "/incidents/upload-photo", IncidentsController, :upload_photo
+    get "/incidents/nearby", IncidentsController, :nearby
+    get "/incidents/feed", IncidentsController, :feed
+    post "/incidents/:id/verify", IncidentsController, :verify
+    get "/incidents/:id/verifications", IncidentsController, :verifications
+    post "/notifications/register-token", NotificationsController, :register_token
+    get "/notifications/preferences", NotificationsController, :get_preferences
+    put "/notifications/preferences", NotificationsController, :update_preferences
+    post "/moderation/validate-image", ModerationController, :validate_image
+    post "/moderation/validate-text", ModerationController, :validate_text
+  end
+
+  scope "/api", HotspotApiWeb do
+    pipe_through [:api, :auth, :rate_limit_incident]
+    post "/incidents", IncidentsController, :create
+  end
+
+  # Admin routes (TODO: Add admin authentication pipeline)
+  scope "/api/v1/admin", HotspotApiWeb.Admin, as: :admin do
+    pipe_through :api_v1
 
     # Moderation endpoints
     get "/moderation/flagged-content", ModerationController, :flagged_content
