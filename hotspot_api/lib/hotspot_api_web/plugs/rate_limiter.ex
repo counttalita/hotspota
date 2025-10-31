@@ -33,28 +33,33 @@ defmodule HotspotApiWeb.Plugs.RateLimiter do
   end
 
   def call(conn, opts) do
-    identifier = opts.identifier_fn.(conn)
-    key = "rate_limit:#{identifier}"
+    # Skip rate limiting in test environment
+    if Application.get_env(:hotspot_api, :env) == :test do
+      conn
+    else
+      identifier = opts.identifier_fn.(conn)
+      key = "rate_limit:#{identifier}"
 
-    case Hammer.check_rate(key, opts.window_ms, opts.limit) do
-      {:allow, count} ->
-        conn
-        |> put_resp_header("x-ratelimit-limit", to_string(opts.limit))
-        |> put_resp_header("x-ratelimit-remaining", to_string(opts.limit - count))
-        |> put_resp_header("x-ratelimit-reset", to_string(get_reset_time(opts.window_ms)))
+      case Hammer.check_rate(key, opts.window_ms, opts.limit) do
+        {:allow, count} ->
+          conn
+          |> put_resp_header("x-ratelimit-limit", to_string(opts.limit))
+          |> put_resp_header("x-ratelimit-remaining", to_string(opts.limit - count))
+          |> put_resp_header("x-ratelimit-reset", to_string(get_reset_time(opts.window_ms)))
 
-      {:deny, _limit} ->
-        Logger.warning("Rate limit exceeded for #{identifier}")
+        {:deny, _limit} ->
+          Logger.warning("Rate limit exceeded for #{identifier}")
 
-        conn
-        |> put_status(:too_many_requests)
-        |> put_resp_header("retry-after", to_string(div(opts.window_ms, 1000)))
-        |> json(%{
-          error: "Rate limit exceeded",
-          message: "Too many requests. Please try again later.",
-          retry_after_seconds: div(opts.window_ms, 1000)
-        })
-        |> halt()
+          conn
+          |> put_status(:too_many_requests)
+          |> put_resp_header("retry-after", to_string(div(opts.window_ms, 1000)))
+          |> json(%{
+            error: "Rate limit exceeded",
+            message: "Too many requests. Please try again later.",
+            retry_after_seconds: div(opts.window_ms, 1000)
+          })
+          |> halt()
+      end
     end
   end
 

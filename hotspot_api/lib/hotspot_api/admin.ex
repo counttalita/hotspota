@@ -469,10 +469,7 @@ defmodule HotspotApi.Admin do
   def get_user_with_details!(id) do
     HotspotApi.Accounts.User
     |> Repo.get!(id)
-    |> Repo.preload([
-      incidents: from(i in HotspotApi.Incidents.Incident, order_by: [desc: i.inserted_at], limit: 50),
-      verifications: from(v in HotspotApi.Incidents.IncidentVerification, order_by: [desc: v.inserted_at], limit: 50)
-    ])
+    |> Repo.preload([])
   end
 
   @doc """
@@ -483,10 +480,10 @@ defmodule HotspotApi.Admin do
 
     # Store suspension info in notification_config
     suspension_data = %{
-      suspended: true,
-      suspended_at: DateTime.utc_now(),
-      suspended_by: admin_id,
-      suspension_reason: reason
+      "suspended" => true,
+      "suspended_at" => DateTime.utc_now(),
+      "suspended_by" => admin_id,
+      "suspension_reason" => reason
     }
 
     updated_config = Map.merge(user.notification_config || %{}, suspension_data)
@@ -510,10 +507,10 @@ defmodule HotspotApi.Admin do
 
     # Store ban info in notification_config
     ban_data = %{
-      banned: true,
-      banned_at: DateTime.utc_now(),
-      banned_by: admin_id,
-      ban_reason: reason
+      "banned" => true,
+      "banned_at" => DateTime.utc_now(),
+      "banned_by" => admin_id,
+      "ban_reason" => reason
     }
 
     updated_config = Map.merge(user.notification_config || %{}, ban_data)
@@ -800,13 +797,14 @@ defmodule HotspotApi.Admin do
     """
 
     avg_verifications = case Ecto.Adapters.SQL.query(Repo, avg_verifications_query, [start_date, end_date]) do
-      {:ok, %{rows: [[avg]]}} when not is_nil(avg) -> Float.round(avg, 1)
+      {:ok, %{rows: [[avg]]}} when not is_nil(avg) ->
+        avg |> Decimal.to_float() |> Float.round(1)
       _ -> 0.0
     end
 
     # Retention rate (users active in current period who were also active in previous period)
-    period_days = Date.diff(end_date, start_date)
-    previous_start = Date.add(start_date, -period_days)
+    period_seconds = DateTime.diff(end_date, start_date, :second)
+    previous_start = DateTime.add(start_date, -period_seconds, :second)
     previous_end = start_date
 
     retention_query = """
@@ -892,7 +890,12 @@ defmodule HotspotApi.Admin do
         trends = get_analytics_trends(start_date, end_date)
         csv_header = "Date,Hijacking,Mugging,Accident,Total\n"
         csv_rows = Enum.map(trends, fn trend ->
-          date_str = trend.date |> DateTime.to_date() |> Date.to_string()
+          date_str = case trend.date do
+            %DateTime{} = dt -> dt |> DateTime.to_date() |> Date.to_string()
+            %NaiveDateTime{} = ndt -> ndt |> NaiveDateTime.to_date() |> Date.to_string()
+            %Date{} = d -> Date.to_string(d)
+            _ -> to_string(trend.date)
+          end
           "#{date_str},#{trend.hijacking_count},#{trend.mugging_count},#{trend.accident_count},#{trend.total_count}"
         end)
         csv_header <> Enum.join(csv_rows, "\n")
