@@ -42,6 +42,7 @@ defmodule HotspotApiWeb.Router do
     post "/incidents/upload-photo", IncidentsController, :upload_photo
     get "/incidents/nearby", IncidentsController, :nearby
     get "/incidents/feed", IncidentsController, :feed
+    get "/incidents/heatmap", IncidentsController, :heatmap
     post "/incidents/:id/verify", IncidentsController, :verify
     get "/incidents/:id/verifications", IncidentsController, :verifications
 
@@ -79,6 +80,7 @@ defmodule HotspotApiWeb.Router do
     post "/incidents/upload-photo", IncidentsController, :upload_photo
     get "/incidents/nearby", IncidentsController, :nearby
     get "/incidents/feed", IncidentsController, :feed
+    get "/incidents/heatmap", IncidentsController, :heatmap
     post "/incidents/:id/verify", IncidentsController, :verify
     get "/incidents/:id/verifications", IncidentsController, :verifications
     post "/notifications/register-token", NotificationsController, :register_token

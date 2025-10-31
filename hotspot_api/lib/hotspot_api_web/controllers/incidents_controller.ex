@@ -212,6 +212,21 @@ defmodule HotspotApiWeb.IncidentsController do
     end
   end
 
+  @doc """
+  Get heatmap data showing incident clusters from the past 7 days.
+  Returns cluster centers with incident counts and dominant type.
+  Only includes clusters with 5+ incidents.
+  """
+  def heatmap(conn, _params) do
+    heatmap_data = Incidents.get_heatmap_data()
+
+    conn
+    |> json(%{
+      clusters: heatmap_data,
+      generated_at: DateTime.utc_now()
+    })
+  end
+
   defp parse_float(nil, field), do: {:error, field}
   defp parse_float(value, _field) when is_float(value), do: {:ok, value}
   defp parse_float(value, field) when is_binary(value) do

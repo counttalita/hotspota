@@ -7,7 +7,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
 import geohash from 'ngeohash';
@@ -21,9 +21,17 @@ const INCIDENT_COLORS = {
   accident: '#3B82F6', // blue
 };
 
+const HEAT_ZONE_COLORS = {
+  hijacking: 'rgba(239, 68, 68, 0.3)', // red with transparency
+  mugging: 'rgba(249, 115, 22, 0.3)', // orange with transparency
+  accident: 'rgba(59, 130, 246, 0.3)', // blue with transparency
+};
+
 const MapScreen = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [incidents, setIncidents] = useState([]);
+  const [heatZones, setHeatZones] = useState([]);
+  const [showHeatZones, setShowHeatZones] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [loading, setLoading] = useState(true);
   const [locationPermission, setLocationPermission] = useState(false);
@@ -47,6 +55,7 @@ const MapScreen = () => {
   useEffect(() => {
     if (userLocation) {
       fetchNearbyIncidents();
+      fetchHeatmapData();
       updateWebSocketLocation(userLocation);
     }
   }, [userLocation]);
@@ -205,6 +214,18 @@ const MapScreen = () => {
     }
   };
 
+  const fetchHeatmapData = async () => {
+    if (!isOnline) return;
+
+    try {
+      const data = await incidentService.getHeatmap();
+      setHeatZones(data.clusters || []);
+    } catch (error) {
+      console.error('Error fetching heatmap data:', error);
+      // Don't show alert for heatmap errors - it's not critical
+    }
+  };
+
   const centerOnUserLocation = () => {
     if (userLocation && mapRef.current) {
       mapRef.current.animateToRegion({
@@ -240,11 +261,18 @@ const MapScreen = () => {
     // Add the new incident to the map immediately
     setIncidents(prev => [incident, ...prev]);
     
+    // Refresh heatmap data after a new incident is reported
+    fetchHeatmapData();
+    
     // Show success message
     Alert.alert(
       'Success',
       'Your incident report has been submitted successfully.'
     );
+  };
+
+  const toggleHeatZones = () => {
+    setShowHeatZones(prev => !prev);
   };
 
   const handleVerifyIncident = async (incidentId) => {
@@ -338,6 +366,22 @@ const MapScreen = () => {
         showsUserLocation={true}
         showsMyLocationButton={false}
       >
+        {/* Heat zones - render first so they appear below markers */}
+        {showHeatZones && heatZones.map((zone, index) => (
+          <Circle
+            key={`heat-zone-${index}`}
+            center={{
+              latitude: zone.center.latitude,
+              longitude: zone.center.longitude,
+            }}
+            radius={zone.radius}
+            fillColor={HEAT_ZONE_COLORS[zone.dominant_type] || 'rgba(128, 128, 128, 0.3)'}
+            strokeColor={INCIDENT_COLORS[zone.dominant_type] || '#808080'}
+            strokeWidth={2}
+          />
+        ))}
+
+        {/* Incident markers */}
         {incidents.map((incident) => (
           <Marker
             key={incident.id}
@@ -350,6 +394,19 @@ const MapScreen = () => {
           />
         ))}
       </MapView>
+
+      {/* Heat zones toggle button */}
+      <TouchableOpacity
+        style={[styles.heatZoneToggle, showHeatZones && styles.heatZoneToggleActive]}
+        onPress={toggleHeatZones}
+      >
+        <Text style={styles.heatZoneToggleText}>
+          {showHeatZones ? '🔥' : '🔥'}
+        </Text>
+        <Text style={[styles.heatZoneToggleLabel, showHeatZones && styles.heatZoneToggleLabelActive]}>
+          Heat Zones
+        </Text>
+      </TouchableOpacity>
 
       {/* Center on user location button */}
       <TouchableOpacity
@@ -523,6 +580,40 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  heatZoneToggle: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  heatZoneToggleActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  heatZoneToggleText: {
+    fontSize: 18,
+    marginRight: 6,
+  },
+  heatZoneToggleLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  heatZoneToggleLabelActive: {
+    color: '#92400E',
   },
   centerButton: {
     position: 'absolute',

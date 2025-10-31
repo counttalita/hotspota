@@ -364,4 +364,88 @@ defmodule HotspotApi.Incidents do
     |> where([i], i.expires_at <= ^now and i.verification_count == 0)
     |> Repo.delete_all()
   end
+
+  @doc """
+  Generates heatmap data by clustering incidents from the past 7 days using PostGIS ST_ClusterDBSCAN.
+  Returns cluster centers with incident counts and dominant incident type.
+  Only returns clusters with 5 or more incidents.
+
+  ## Examples
+
+      iex> get_heatmap_data()
+      [
+        %{
+          center: %{latitude: -26.2041, longitude: 28.0473},
+          incident_count: 12,
+          dominant_type: "hijacking",
+          radius: 500
+        },
+        ...
+      ]
+
+  """
+  def get_heatmap_data do
+    seven_days_ago = DateTime.add(DateTime.utc_now(), -7, :day)
+    now = DateTime.utc_now()
+
+    # Query incidents from past 7 days using PostGIS ST_ClusterDBSCAN
+    # eps = 0.01 degrees (~1.1km at equator)
+    # minpoints = 5 (minimum incidents to form a cluster)
+    query = """
+    WITH clustered_incidents AS (
+      SELECT
+        id,
+        type,
+        location,
+        ST_ClusterDBSCAN(location, eps := 0.01, minpoints := 5) OVER () AS cluster_id
+      FROM incidents
+      WHERE inserted_at >= $1
+        AND expires_at > $2
+    ),
+    cluster_stats AS (
+      SELECT
+        cluster_id,
+        COUNT(*) AS incident_count,
+        ST_Centroid(ST_Collect(location)) AS center,
+        MODE() WITHIN GROUP (ORDER BY type) AS dominant_type
+      FROM clustered_incidents
+      WHERE cluster_id IS NOT NULL
+      GROUP BY cluster_id
+      HAVING COUNT(*) >= 5
+    )
+    SELECT
+      ST_Y(center) AS latitude,
+      ST_X(center) AS longitude,
+      incident_count,
+      dominant_type
+    FROM cluster_stats
+    ORDER BY incident_count DESC
+    """
+
+    case Ecto.Adapters.SQL.query(Repo, query, [seven_days_ago, now]) do
+      {:ok, %{rows: rows}} ->
+        Enum.map(rows, fn [lat, lng, count, type] ->
+          %{
+            center: %{
+              latitude: lat,
+              longitude: lng
+            },
+            incident_count: count,
+            dominant_type: type,
+            radius: calculate_cluster_radius(count)
+          }
+        end)
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  # Calculate visual radius for heat zone based on incident count
+  # More incidents = larger circle
+  defp calculate_cluster_radius(count) when count >= 20, do: 1000
+  defp calculate_cluster_radius(count) when count >= 15, do: 800
+  defp calculate_cluster_radius(count) when count >= 10, do: 600
+  defp calculate_cluster_radius(count) when count >= 5, do: 400
+  defp calculate_cluster_radius(_count), do: 300
 end

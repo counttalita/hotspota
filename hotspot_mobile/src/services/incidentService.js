@@ -248,4 +248,18 @@ export const incidentService = {
       throw error;
     }
   },
+
+  /**
+   * Get heatmap data showing incident clusters from the past 7 days
+   * @returns {Promise<Object>} Object containing clusters array and generated_at timestamp
+   */
+  async getHeatmap() {
+    try {
+      const response = await api.get('/incidents/heatmap');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching heatmap data:', error.response?.data || error.message);
+      throw error;
+    }
+  },
 };
