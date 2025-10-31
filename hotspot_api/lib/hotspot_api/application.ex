@@ -12,6 +12,8 @@ defmodule HotspotApi.Application do
       HotspotApi.Repo,
       {DNSCluster, query: Application.get_env(:hotspot_api, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: HotspotApi.PubSub},
+      # Start cache for performance optimization
+      HotspotApi.Cache,
       # Start Oban for background jobs
       {Oban, Application.fetch_env!(:hotspot_api, Oban)},
       # Start a worker by calling: HotspotApi.Worker.start_link(arg)

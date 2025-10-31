@@ -36,15 +36,21 @@ defmodule HotspotApiWeb.Plugs.RequestLogger do
       timestamp: DateTime.utc_now()
     }
 
-    # Log at different levels based on status code
-    case conn.status do
-      status when status >= 500 ->
+    # Track performance metrics
+    track_performance_metrics(conn.request_path, duration_ms, conn.status)
+
+    # Log at different levels based on status code and duration
+    cond do
+      conn.status >= 500 ->
         Logger.error("API Request", metadata)
 
-      status when status >= 400 ->
+      conn.status >= 400 ->
         Logger.warning("API Request", metadata)
 
-      _ ->
+      duration_ms > 1000 ->
+        Logger.warning("Slow API Request", Map.put(metadata, :slow_request, true))
+
+      true ->
         Logger.info("API Request", metadata)
     end
 
@@ -64,6 +70,15 @@ defmodule HotspotApiWeb.Plugs.RequestLogger do
         severity: get_severity(conn.status)
       })
     end
+  end
+
+  defp track_performance_metrics(path, duration_ms, status) do
+    # Track request count and duration for monitoring
+    :telemetry.execute(
+      [:hotspot_api, :request],
+      %{duration: duration_ms, count: 1},
+      %{path: path, status: status}
+    )
   end
 
   defp get_user_id(conn) do

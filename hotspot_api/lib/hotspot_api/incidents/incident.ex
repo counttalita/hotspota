@@ -12,6 +12,7 @@ defmodule HotspotApi.Incidents.Incident do
     field :is_verified, :boolean, default: false
     field :expires_at, :utc_datetime
     field :location, Geo.PostGIS.Geometry
+    field :idempotency_key, :string
 
     belongs_to :user, HotspotApi.Accounts.User
 
@@ -23,11 +24,12 @@ defmodule HotspotApi.Incidents.Incident do
   @doc false
   def changeset(incident, attrs) do
     incident
-    |> cast(attrs, [:type, :description, :photo_url, :verification_count, :is_verified, :expires_at, :user_id])
+    |> cast(attrs, [:type, :description, :photo_url, :verification_count, :is_verified, :expires_at, :user_id, :idempotency_key])
     |> cast_location(attrs)
     |> validate_required([:type, :location, :expires_at, :user_id])
     |> validate_inclusion(:type, @valid_types, message: "must be one of: hijacking, mugging, accident")
     |> validate_length(:description, max: 280)
+    |> unique_constraint([:user_id, :idempotency_key], name: :incidents_user_id_idempotency_key_index)
     |> foreign_key_constraint(:user_id)
   end
 

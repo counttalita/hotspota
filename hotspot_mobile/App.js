@@ -8,6 +8,7 @@ import PhoneAuthScreen from './src/screens/PhoneAuthScreen';
 import OTPVerificationScreen from './src/screens/OTPVerificationScreen';
 import MainScreen from './src/screens/MainScreen';
 import NotificationBanner from './src/components/NotificationBanner';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import { authService } from './src/services/authService';
 import notificationService from './src/services/notificationService';
 
@@ -95,7 +96,14 @@ export default function App() {
   }
 
   return (
-    <>
+    <ErrorBoundary
+      onReset={() => {
+        // Reset app state on error recovery
+        setIsLoading(true);
+        checkAuth();
+      }}
+      showReportButton={true}
+    >
       <StatusBar style="auto" />
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
@@ -114,7 +122,7 @@ export default function App() {
         onPress={handleNotificationPress}
         onDismiss={handleNotificationDismiss}
       />
-    </>
+    </ErrorBoundary>
   );
 }
 

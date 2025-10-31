@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from './config';
+import offlineService from './offlineService';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -62,15 +63,39 @@ export const incidentService = {
    * @param {number} incidentData.longitude - Longitude coordinate
    * @param {string} [incidentData.description] - Optional description
    * @param {string} [incidentData.photo_url] - Optional photo URL
-   * @returns {Promise<Object>} The created incident
+   * @returns {Promise<Object>} The created incident or queued report
    */
   async create(incidentData) {
+    // Check if online
+    const isOnline = await offlineService.checkConnectivity();
+    
+    if (!isOnline) {
+      // Queue for later submission
+      const clientId = await offlineService.queueReport(incidentData);
+      return {
+        ...incidentData,
+        id: clientId,
+        queued: true,
+        status: 'pending_sync'
+      };
+    }
+
     try {
       const response = await api.post('/incidents', {
         incident: incidentData,
       });
       return response.data.data;
     } catch (error) {
+      // If network error, queue the report
+      if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response) {
+        const clientId = await offlineService.queueReport(incidentData);
+        return {
+          ...incidentData,
+          id: clientId,
+          queued: true,
+          status: 'pending_sync'
+        };
+      }
       console.error('Error creating incident:', error.response?.data || error.message);
       throw error;
     }
@@ -92,9 +117,21 @@ export const incidentService = {
           radius: radius,
         },
       });
+      
+      // Cache incidents for offline viewing
+      await offlineService.cacheIncidents(response.data.data);
+      
       return response.data.data;
     } catch (error) {
       console.error('Error fetching nearby incidents:', error.response?.data || error.message);
+      
+      // Try to return cached incidents if offline
+      const cached = await offlineService.getCachedIncidents();
+      if (cached) {
+        console.log('Returning cached incidents (offline mode)');
+        return cached.map(incident => ({ ...incident, cached: true }));
+      }
+      
       throw error;
     }
   },
@@ -170,83 +207,25 @@ export const incidentService = {
   },
 
   /**
-   * Queue an incident report for offline submission
-   * @param {Object} incidentData - The incident data to queue
-   */
-  async queueOfflineReport(incidentData) {
-    try {
-      const queueKey = 'offline_incident_queue';
-      const existingQueue = await AsyncStorage.getItem(queueKey);
-      const queue = existingQueue ? JSON.parse(existingQueue) : [];
-      
-      const queuedReport = {
-        ...incidentData,
-        queuedAt: new Date().toISOString(),
-        id: `temp_${Date.now()}`,
-      };
-      
-      queue.push(queuedReport);
-      await AsyncStorage.setItem(queueKey, JSON.stringify(queue));
-      
-      return queuedReport;
-    } catch (error) {
-      console.error('Error queuing offline report:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get all queued offline reports
-   * @returns {Promise<Array>} Array of queued reports
-   */
-  async getOfflineQueue() {
-    try {
-      const queueKey = 'offline_incident_queue';
-      const existingQueue = await AsyncStorage.getItem(queueKey);
-      return existingQueue ? JSON.parse(existingQueue) : [];
-    } catch (error) {
-      console.error('Error getting offline queue:', error);
-      return [];
-    }
-  },
-
-  /**
    * Sync all queued offline reports to the server
-   * @returns {Promise<Object>} Object with success and failed counts
+   * @returns {Promise<Object>} Object with synced and failed counts
    */
   async syncOfflineReports() {
     try {
-      const queue = await this.getOfflineQueue();
-      if (queue.length === 0) {
-        return { success: 0, failed: 0 };
-      }
-
-      let successCount = 0;
-      let failedCount = 0;
-      const remainingQueue = [];
-
-      for (const report of queue) {
-        try {
-          // Remove temporary fields
-          const { queuedAt, id, ...reportData } = report;
-          await this.create(reportData);
-          successCount++;
-        } catch (error) {
-          console.error('Failed to sync report:', error);
-          failedCount++;
-          remainingQueue.push(report);
-        }
-      }
-
-      // Update queue with only failed reports
-      const queueKey = 'offline_incident_queue';
-      await AsyncStorage.setItem(queueKey, JSON.stringify(remainingQueue));
-
-      return { success: successCount, failed: failedCount };
+      const result = await offlineService.syncQueuedReports(api);
+      return result;
     } catch (error) {
       console.error('Error syncing offline reports:', error);
       throw error;
     }
+  },
+
+  /**
+   * Get count of queued offline reports
+   * @returns {Promise<number>}
+   */
+  async getOfflineQueueCount() {
+    return await offlineService.getQueueCount();
   },
 
   /**

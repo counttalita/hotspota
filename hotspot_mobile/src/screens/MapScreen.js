@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -16,6 +16,11 @@ import { geofenceService } from '../services/geofenceService';
 import websocketService from '../services/websocketService';
 import ReportIncidentModal from '../components/ReportIncidentModal';
 import HotspotZoneBanner from '../components/HotspotZoneBanner';
+import OfflineIndicator from '../components/OfflineIndicator';
+import { useMarkerClustering, ClusterMarker } from '../components/MarkerCluster';
+import { MapMarkerSkeleton } from '../components/LoadingSkeleton';
+import { lightHaptic, warningHaptic, successHaptic } from '../utils/haptics';
+import performanceMonitor from '../utils/performance';
 
 const INCIDENT_COLORS = {
   hijacking: '#EF4444', // red
@@ -58,8 +63,12 @@ const MapScreen = () => {
   const [verifyingIncident, setVerifyingIncident] = useState(false);
   const [verifiedIncidents, setVerifiedIncidents] = useState(new Set());
   const [zoneAlert, setZoneAlert] = useState(null);
+  const [mapZoom, setMapZoom] = useState(12);
   const mapRef = useRef(null);
   const locationWatchRef = useRef(null);
+
+  // Use marker clustering for better performance
+  const clusteredMarkers = useMarkerClustering(incidents, mapZoom);
 
   useEffect(() => {
     requestLocationPermission();
@@ -249,10 +258,13 @@ const MapScreen = () => {
     if (!userLocation) return;
 
     try {
-      const data = await incidentService.getNearby(
-        userLocation.latitude,
-        userLocation.longitude,
-        5000 // 5km radius
+      const data = await performanceMonitor.measureAsync(
+        'Fetch Nearby Incidents',
+        () => incidentService.getNearby(
+          userLocation.latitude,
+          userLocation.longitude,
+          5000 // 5km radius
+        )
       );
       setIncidents(data);
     } catch (error) {
@@ -427,24 +439,29 @@ const MapScreen = () => {
   };
 
   const toggleHeatZones = () => {
+    lightHaptic();
     setShowHeatZones(prev => !prev);
   };
 
   const toggleHotspotZones = () => {
+    lightHaptic();
     setShowHotspotZones(prev => !prev);
   };
 
   const handleVerifyIncident = async (incidentId) => {
     if (!isOnline) {
+      warningHaptic();
       Alert.alert('Offline', 'You need to be online to verify incidents.');
       return;
     }
 
     if (verifiedIncidents.has(incidentId)) {
+      warningHaptic();
       Alert.alert('Already Verified', 'You have already verified this incident.');
       return;
     }
 
+    lightHaptic();
     setVerifyingIncident(true);
 
     try {
@@ -475,8 +492,10 @@ const MapScreen = () => {
       // Mark as verified by this user
       setVerifiedIncidents(prev => new Set([...prev, incidentId]));
 
+      successHaptic();
       Alert.alert('Success', result.message || 'Incident verified successfully!');
     } catch (error) {
+      warningHaptic();
       const errorMessage = error.response?.data?.error || 'Failed to verify incident';
       Alert.alert('Error', errorMessage);
     } finally {
@@ -487,8 +506,7 @@ const MapScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#EF4444" />
-        <Text style={styles.loadingText}>Loading map...</Text>
+        <MapMarkerSkeleton />
       </View>
     );
   }
@@ -524,6 +542,11 @@ const MapScreen = () => {
         }
         showsUserLocation={true}
         showsMyLocationButton={false}
+        onRegionChangeComplete={(region) => {
+          // Estimate zoom level from latitudeDelta
+          const zoom = Math.round(Math.log(360 / region.latitudeDelta) / Math.LN2);
+          setMapZoom(zoom);
+        }}
       >
         {/* Hotspot zones - render first (geofenced areas) */}
         {showHotspotZones && hotspotZones.map((zone) => (
@@ -555,16 +578,28 @@ const MapScreen = () => {
           />
         ))}
 
-        {/* Incident markers */}
-        {incidents.map((incident) => (
-          <Marker
-            key={incident.id}
-            coordinate={{
-              latitude: incident.location.latitude,
-              longitude: incident.location.longitude,
+        {/* Clustered incident markers for better performance */}
+        {clusteredMarkers.map((cluster, index) => (
+          <ClusterMarker
+            key={cluster.type === 'single' ? cluster.incident.id : `cluster-${index}`}
+            cluster={cluster}
+            onPress={(data) => {
+              lightHaptic();
+              if (Array.isArray(data)) {
+                // Cluster tapped - zoom in
+                if (mapRef.current) {
+                  mapRef.current.animateToRegion({
+                    latitude: cluster.latitude,
+                    longitude: cluster.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  });
+                }
+              } else {
+                // Single incident tapped
+                setSelectedIncident(data);
+              }
             }}
-            pinColor={INCIDENT_COLORS[incident.type]}
-            onPress={() => setSelectedIncident(incident)}
           />
         ))}
       </MapView>
@@ -645,17 +680,16 @@ const MapScreen = () => {
       {/* Floating Report Incident Button */}
       <TouchableOpacity
         style={styles.reportButton}
-        onPress={() => setReportModalVisible(true)}
+        onPress={() => {
+          lightHaptic();
+          setReportModalVisible(true);
+        }}
       >
         <Text style={styles.reportButtonText}>+ Report Incident</Text>
       </TouchableOpacity>
 
       {/* Offline Indicator */}
-      {!isOnline && (
-        <View style={styles.offlineIndicator}>
-          <Text style={styles.offlineText}>📡 Offline</Text>
-        </View>
-      )}
+      <OfflineIndicator />
 
       {/* Report Incident Modal */}
       <ReportIncidentModal

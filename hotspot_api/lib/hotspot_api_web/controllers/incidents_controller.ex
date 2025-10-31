@@ -60,25 +60,16 @@ defmodule HotspotApiWeb.IncidentsController do
     # Get user_id from Guardian claims
     user_id = Guardian.Plug.current_resource(conn).id
 
+    # Check for idempotency key to prevent duplicate submissions
+    idempotency_key = get_req_header(conn, "idempotency-key") |> List.first()
+
     # Validate description if present
     with :ok <- validate_description(incident_params["description"]),
-         :ok <- check_repeat_offender(user_id) do
-      incident_params = Map.put(incident_params, "user_id", user_id)
-
-      case Incidents.create_incident(incident_params) do
-        {:ok, %Incident{} = incident} ->
-          # Send notifications to nearby users asynchronously
-          Task.start(fn ->
-            HotspotApi.Notifications.send_incident_alert(incident.id, incident.location)
-          end)
-
-          conn
-          |> put_status(:created)
-          |> render(:show, incident: incident)
-
-        {:error, changeset} ->
-          {:error, changeset}
-      end
+         :ok <- check_repeat_offender(user_id),
+         {:ok, incident} <- create_or_get_incident(user_id, incident_params, idempotency_key) do
+      conn
+      |> put_status(:created)
+      |> render(:show, incident: incident)
     else
       {:error, :text_validation_failed, message} ->
         conn
@@ -92,7 +83,104 @@ defmodule HotspotApiWeb.IncidentsController do
           error: "Account flagged",
           message: "Your account has been flagged for #{count} violations. Please contact support."
         })
+
+      {:error, changeset} ->
+        {:error, changeset}
     end
+  end
+
+  defp create_or_get_incident(user_id, incident_params, nil) do
+    # No idempotency key, create normally
+    incident_params = Map.put(incident_params, "user_id", user_id)
+
+    case Incidents.create_incident(incident_params) do
+      {:ok, %Incident{} = incident} ->
+        # Send notifications to nearby users asynchronously
+        Task.start(fn ->
+          HotspotApi.Notifications.send_incident_alert(incident.id, incident.location)
+        end)
+
+        {:ok, incident}
+
+      {:error, changeset} ->
+        {:error, changeset}
+    end
+  end
+
+  defp create_or_get_incident(user_id, incident_params, idempotency_key) do
+    # Check if incident with this idempotency key already exists
+    case Incidents.get_incident_by_idempotency_key(user_id, idempotency_key) do
+      nil ->
+        # Create new incident with idempotency key
+        incident_params =
+          incident_params
+          |> Map.put("user_id", user_id)
+          |> Map.put("idempotency_key", idempotency_key)
+
+        case Incidents.create_incident(incident_params) do
+          {:ok, %Incident{} = incident} ->
+            # Send notifications to nearby users asynchronously
+            Task.start(fn ->
+              HotspotApi.Notifications.send_incident_alert(incident.id, incident.location)
+            end)
+
+            {:ok, incident}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
+
+      existing_incident ->
+        # Return existing incident (idempotent response)
+        {:ok, existing_incident}
+    end
+  end
+
+  @doc """
+  Sync multiple queued incident reports from offline clients.
+  Accepts an array of incidents and processes them with idempotency.
+  """
+  def sync(conn, %{"incidents" => incidents}) when is_list(incidents) do
+    user_id = Guardian.Plug.current_resource(conn).id
+
+    results =
+      Enum.map(incidents, fn incident_params ->
+        idempotency_key = incident_params["idempotency_key"]
+
+        case create_or_get_incident(user_id, incident_params, idempotency_key) do
+          {:ok, incident} ->
+            %{
+              status: "success",
+              idempotency_key: idempotency_key,
+              incident_id: incident.id
+            }
+
+          {:error, changeset} ->
+            errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
+
+            %{
+              status: "error",
+              idempotency_key: idempotency_key,
+              error: format_error(errors)
+            }
+        end
+      end)
+
+    success_count = Enum.count(results, &(&1.status == "success"))
+    error_count = Enum.count(results, &(&1.status == "error"))
+
+    conn
+    |> json(%{
+      success_count: success_count,
+      error_count: error_count,
+      results: results
+    })
+  end
+
+  def sync(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Invalid sync request. Expected 'incidents' array."})
   end
 
   defp validate_description(nil), do: :ok

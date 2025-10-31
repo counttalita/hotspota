@@ -62,10 +62,12 @@ if config_env() == :prod do
     backup_encryption_key: System.get_env("BACKUP_ENCRYPTION_KEY")
 
   # Paystack configuration
+  paystack_callback_url = System.get_env("PAYSTACK_CALLBACK_URL") || "https://api.hotspot.app/payment/callback"
+
   config :hotspot_api,
     paystack_secret_key: System.get_env("PAYSTACK_SECRET_KEY"),
     paystack_public_key: System.get_env("PAYSTACK_PUBLIC_KEY"),
-    paystack_callback_url: System.get_env("PAYSTACK_CALLBACK_URL") || "https://#{host}/payment/callback"
+    paystack_callback_url: paystack_callback_url
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

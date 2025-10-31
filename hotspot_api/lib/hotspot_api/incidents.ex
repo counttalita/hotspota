@@ -6,6 +6,7 @@ defmodule HotspotApi.Incidents do
   import Ecto.Query, warn: false
   import Geo.PostGIS
   alias HotspotApi.Repo
+  alias HotspotApi.Cache
 
   alias HotspotApi.Incidents.Incident
   alias HotspotApi.Incidents.IncidentVerification
@@ -43,6 +44,27 @@ defmodule HotspotApi.Incidents do
 
   """
   def get_incident!(id), do: Repo.get!(Incident, id)
+
+  @doc """
+  Gets an incident by idempotency_key.
+  Returns nil if no incident is found.
+
+  ## Examples
+
+      iex> get_by_idempotency_key("key-456")
+      %Incident{}
+
+      iex> get_by_idempotency_key("nonexistent")
+      nil
+
+  """
+  def get_by_idempotency_key(idempotency_key) when is_binary(idempotency_key) do
+    Incident
+    |> where([i], i.idempotency_key == ^idempotency_key)
+    |> Repo.one()
+  end
+
+  def get_by_idempotency_key(_), do: nil
 
   @doc """
   Creates an incident with automatic expiration set to 48 hours from now.
@@ -369,6 +391,7 @@ defmodule HotspotApi.Incidents do
   Generates heatmap data by clustering incidents from the past 7 days using PostGIS ST_ClusterDBSCAN.
   Returns cluster centers with incident counts and dominant incident type.
   Only returns clusters with 5 or more incidents.
+  Results are cached for 5 minutes to improve performance.
 
   ## Examples
 
@@ -385,6 +408,11 @@ defmodule HotspotApi.Incidents do
 
   """
   def get_heatmap_data do
+    # Cache heatmap data for 5 minutes
+    Cache.fetch("heatmap_data", fn -> compute_heatmap_data() end, :timer.minutes(5))
+  end
+
+  defp compute_heatmap_data do
     seven_days_ago = DateTime.add(DateTime.utc_now(), -7, :day)
     now = DateTime.utc_now()
 

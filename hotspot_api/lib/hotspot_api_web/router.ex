@@ -98,6 +98,9 @@ defmodule HotspotApiWeb.Router do
 
     # Rate-limited incident creation
     post "/incidents", IncidentsController, :create
+
+    # Sync endpoint for offline reports (also rate-limited)
+    post "/sync/reports", SyncController, :sync_reports
   end
 
   # Legacy API routes (redirect to v1)
@@ -156,6 +159,7 @@ defmodule HotspotApiWeb.Router do
   scope "/api", HotspotApiWeb do
     pipe_through [:api, :auth, :rate_limit_incident]
     post "/incidents", IncidentsController, :create
+    post "/sync/reports", SyncController, :sync_reports
   end
 
   # Admin routes (TODO: Add admin authentication pipeline)
