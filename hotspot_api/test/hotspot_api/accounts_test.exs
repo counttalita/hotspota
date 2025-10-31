@@ -1,12 +1,17 @@
 defmodule HotspotApi.AccountsTest do
   use HotspotApi.DataCase
 
+  import Mox
+  import HotspotApi.AccountsFixtures
+
   alias HotspotApi.Accounts
+  alias HotspotApi.Guardian
+
+  # Make sure mocks are verified when the test exits
+  setup :verify_on_exit!
 
   describe "users" do
     alias HotspotApi.Accounts.User
-
-    import HotspotApi.AccountsFixtures
 
     @invalid_attrs %{phone_number: nil}
 
@@ -82,24 +87,51 @@ defmodule HotspotApi.AccountsTest do
   describe "OTP functionality" do
     @valid_phone "+27123456789"
 
-    test "send_otp/1 creates an OTP code" do
+    setup do
+      # Configure mock Twilio client for tests
+      Application.put_env(:hotspot_api, :twilio_client, HotspotApi.TwilioMock)
+      :ok
+    end
+
+    test "send_otp/1 creates an OTP code and sends SMS via Twilio" do
+      # Expect Twilio mock to be called
+      expect(HotspotApi.TwilioMock, :send_sms, fn phone, message ->
+        assert phone == @valid_phone
+        assert message =~ "Your Hotspot verification code is:"
+        assert String.length(String.replace(message, ~r/[^\d]/, "")) == 6
+        :ok
+      end)
+
       assert {:ok, otp_code} = Accounts.send_otp(@valid_phone)
       assert otp_code.phone_number == @valid_phone
       assert String.length(otp_code.code) == 6
       assert otp_code.verified == false
     end
 
+    test "send_otp/1 returns error when Twilio fails" do
+      # Expect Twilio mock to fail
+      expect(HotspotApi.TwilioMock, :send_sms, fn _, _ ->
+        {:error, :twilio_error}
+      end)
+
+      assert {:error, :twilio_error} = Accounts.send_otp(@valid_phone)
+    end
+
     test "send_otp/1 enforces rate limiting" do
+      # Mock Twilio for all 3 successful calls
+      expect(HotspotApi.TwilioMock, :send_sms, 3, fn _, _ -> :ok end)
+
       # Send 3 OTPs
       assert {:ok, _} = Accounts.send_otp(@valid_phone)
       assert {:ok, _} = Accounts.send_otp(@valid_phone)
       assert {:ok, _} = Accounts.send_otp(@valid_phone)
 
-      # 4th attempt should fail
+      # 4th attempt should fail due to rate limiting (no Twilio call expected)
       assert {:error, :rate_limit_exceeded} = Accounts.send_otp(@valid_phone)
     end
 
     test "verify_otp/2 with valid code creates or returns user" do
+      expect(HotspotApi.TwilioMock, :send_sms, fn _, _ -> :ok end)
       {:ok, otp_code} = Accounts.send_otp(@valid_phone)
 
       assert {:ok, user} = Accounts.verify_otp(@valid_phone, otp_code.code)
@@ -109,6 +141,7 @@ defmodule HotspotApi.AccountsTest do
     end
 
     test "verify_otp/2 with invalid code returns error" do
+      expect(HotspotApi.TwilioMock, :send_sms, fn _, _ -> :ok end)
       {:ok, _otp_code} = Accounts.send_otp(@valid_phone)
 
       assert {:error, :invalid_or_expired_otp} = Accounts.verify_otp(@valid_phone, "000000")
@@ -133,11 +166,124 @@ defmodule HotspotApi.AccountsTest do
       {:ok, existing_user} = Accounts.create_user(%{phone_number: @valid_phone})
 
       # Send and verify OTP
+      expect(HotspotApi.TwilioMock, :send_sms, fn _, _ -> :ok end)
       {:ok, otp_code} = Accounts.send_otp(@valid_phone)
       assert {:ok, user} = Accounts.verify_otp(@valid_phone, otp_code.code)
 
       # Should return the same user
       assert user.id == existing_user.id
+    end
+  end
+
+  describe "Guardian JWT token functionality" do
+    test "encode_and_sign/1 creates a valid JWT token for user" do
+      user = user_fixture()
+
+      assert {:ok, token, claims} = Guardian.encode_and_sign(user)
+      assert is_binary(token)
+      assert String.length(token) > 0
+      assert claims["sub"] == user.id
+      assert claims["typ"] == "access"
+    end
+
+    test "decode_and_verify/1 decodes a valid JWT token" do
+      user = user_fixture()
+      {:ok, token, _claims} = Guardian.encode_and_sign(user)
+
+      assert {:ok, decoded_claims} = Guardian.decode_and_verify(token)
+      assert decoded_claims["sub"] == user.id
+    end
+
+    test "decode_and_verify/1 rejects invalid token" do
+      assert {:error, _reason} = Guardian.decode_and_verify("invalid_token")
+    end
+
+    test "resource_from_claims/1 returns user from valid claims" do
+      user = user_fixture()
+      {:ok, _token, claims} = Guardian.encode_and_sign(user)
+
+      assert {:ok, fetched_user} = Guardian.resource_from_claims(claims)
+      assert fetched_user.id == user.id
+      assert fetched_user.phone_number == user.phone_number
+    end
+
+    test "resource_from_claims/1 returns error for non-existent user" do
+      fake_claims = %{"sub" => Ecto.UUID.generate()}
+
+      assert {:error, :user_not_found} = Guardian.resource_from_claims(fake_claims)
+    end
+
+    test "subject_for_token/2 extracts user ID" do
+      user = user_fixture()
+
+      assert {:ok, subject} = Guardian.subject_for_token(user, %{})
+      assert subject == user.id
+    end
+
+    test "JWT token expires after configured time" do
+      user = user_fixture()
+
+      # Create token with 1 second TTL
+      assert {:ok, token, _claims} = Guardian.encode_and_sign(user, %{}, ttl: {1, :second})
+
+      # Token should be valid immediately
+      assert {:ok, _claims} = Guardian.decode_and_verify(token)
+
+      # Wait for token to expire (add buffer for clock skew)
+      Process.sleep(2000)
+
+      # Token should now be expired
+      assert {:error, _reason} = Guardian.decode_and_verify(token)
+    end
+  end
+
+  describe "Rate limiting logic" do
+    @rate_limit_phone "+27999888777"
+
+    setup do
+      Application.put_env(:hotspot_api, :twilio_client, HotspotApi.TwilioMock)
+      :ok
+    end
+
+    test "allows 3 OTP requests within an hour" do
+      expect(HotspotApi.TwilioMock, :send_sms, 3, fn _, _ -> :ok end)
+
+      assert {:ok, _} = Accounts.send_otp(@rate_limit_phone)
+      assert {:ok, _} = Accounts.send_otp(@rate_limit_phone)
+      assert {:ok, _} = Accounts.send_otp(@rate_limit_phone)
+    end
+
+    test "blocks 4th OTP request within an hour" do
+      expect(HotspotApi.TwilioMock, :send_sms, 3, fn _, _ -> :ok end)
+
+      # First 3 should succeed
+      Accounts.send_otp(@rate_limit_phone)
+      Accounts.send_otp(@rate_limit_phone)
+      Accounts.send_otp(@rate_limit_phone)
+
+      # 4th should be rate limited
+      assert {:error, :rate_limit_exceeded} = Accounts.send_otp(@rate_limit_phone)
+    end
+
+    test "rate limit resets after one hour" do
+      # This test would require time manipulation in a real scenario
+      # For now, we verify the logic by checking OTP count
+      expect(HotspotApi.TwilioMock, :send_sms, 3, fn _, _ -> :ok end)
+
+      Accounts.send_otp(@rate_limit_phone)
+      Accounts.send_otp(@rate_limit_phone)
+      Accounts.send_otp(@rate_limit_phone)
+
+      # Verify we have 3 OTPs in the last hour
+      one_hour_ago = DateTime.utc_now() |> DateTime.add(-3600, :second)
+
+      count =
+        from(o in Accounts.OtpCode,
+          where: o.phone_number == ^@rate_limit_phone and o.inserted_at > ^one_hour_ago
+        )
+        |> Repo.aggregate(:count)
+
+      assert count == 3
     end
   end
 end

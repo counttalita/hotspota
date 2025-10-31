@@ -8,8 +8,8 @@ defmodule HotspotApi.Repo.Migrations.AddPerformanceIndexes do
     create_if_not_exists index(:incidents, [:is_verified, :inserted_at])
     create_if_not_exists index(:incidents, [:expires_at])
 
-    # Composite index for nearby queries with type filter
-    create_if_not_exists index(:incidents, [:type, :location], using: "GIST")
+    # Separate indexes for type and location (GIST doesn't support varchar without operator class)
+    # The location GIST index already exists from create_incidents migration
 
     # Incident verifications for counting
     create_if_not_exists index(:incident_verifications, [:incident_id])
@@ -36,15 +36,9 @@ defmodule HotspotApi.Repo.Migrations.AddPerformanceIndexes do
     create_if_not_exists index(:otp_codes, [:phone_number, :expires_at])
     create_if_not_exists index(:otp_codes, [:verified, :expires_at])
 
-    # Subscriptions for payment tracking
-    create_if_not_exists index(:subscriptions, [:user_id, :status])
-    create_if_not_exists index(:subscriptions, [:status, :expires_at])
+    # Subscriptions for payment tracking (indexes already created in create_subscriptions migration)
 
-    # Security tables for intrusion detection
-    create_if_not_exists index(:auth_attempts, [:phone_number, :inserted_at])
-    create_if_not_exists index(:auth_attempts, [:ip_address, :inserted_at])
-    create_if_not_exists index(:security_events, [:event_type, :inserted_at])
-    create_if_not_exists index(:security_events, [:user_id, :inserted_at])
+    # Security tables for intrusion detection (indexes already created in create_security_tables migration)
 
     # Moderation tables
     create_if_not_exists index(:flagged_content, [:status, :inserted_at])
@@ -57,7 +51,7 @@ defmodule HotspotApi.Repo.Migrations.AddPerformanceIndexes do
     drop_if_exists index(:incidents, [:user_id, :inserted_at])
     drop_if_exists index(:incidents, [:is_verified, :inserted_at])
     drop_if_exists index(:incidents, [:expires_at])
-    drop_if_exists index(:incidents, [:type, :location])
+    # No composite index to drop
 
     drop_if_exists index(:incident_verifications, [:incident_id])
     drop_if_exists index(:incident_verifications, [:user_id, :inserted_at])
@@ -78,13 +72,9 @@ defmodule HotspotApi.Repo.Migrations.AddPerformanceIndexes do
     drop_if_exists index(:otp_codes, [:phone_number, :expires_at])
     drop_if_exists index(:otp_codes, [:verified, :expires_at])
 
-    drop_if_exists index(:subscriptions, [:user_id, :status])
-    drop_if_exists index(:subscriptions, [:status, :expires_at])
+    # Subscription indexes managed in create_subscriptions migration
 
-    drop_if_exists index(:auth_attempts, [:phone_number, :inserted_at])
-    drop_if_exists index(:auth_attempts, [:ip_address, :inserted_at])
-    drop_if_exists index(:security_events, [:event_type, :inserted_at])
-    drop_if_exists index(:security_events, [:user_id, :inserted_at])
+    # Security table indexes managed in create_security_tables migration
 
     drop_if_exists index(:flagged_content, [:status, :inserted_at])
     drop_if_exists index(:flagged_content, [:incident_id])

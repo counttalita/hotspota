@@ -63,6 +63,8 @@ defmodule HotspotApi.MixProject do
       # Code quality
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      # Testing
+      {:mox, "~> 1.1", only: :test},
       # CORS
       {:cors_plug, "~> 3.0"},
       # Rate limiting
