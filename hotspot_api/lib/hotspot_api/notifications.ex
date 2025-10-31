@@ -306,4 +306,24 @@ defmodule HotspotApi.Notifications do
       {:error, :no_tokens_found}
     end
   end
+
+  @doc """
+  Sends an emergency notification to a user when their contact triggers panic button.
+  """
+  def send_emergency_notification(user_id, emergency_phone, latitude, longitude) do
+    maps_link = "https://www.google.com/maps?q=#{latitude},#{longitude}"
+
+    title = "🚨 Emergency Alert"
+    body = "#{emergency_phone} has activated their panic button and may need help! Tap to view location."
+
+    data = %{
+      "type" => "emergency_alert",
+      "emergency_phone" => emergency_phone,
+      "latitude" => to_string(latitude),
+      "longitude" => to_string(longitude),
+      "maps_link" => maps_link
+    }
+
+    send_push_notification(user_id, %{title: title, body: body, data: data})
+  end
 end

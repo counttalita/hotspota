@@ -87,6 +87,20 @@ defmodule HotspotApiWeb.Router do
     post "/subscriptions/initialize", SubscriptionsController, :initialize
     get "/subscriptions/status", SubscriptionsController, :status
     post "/subscriptions/cancel", SubscriptionsController, :cancel
+
+    # Emergency contacts and panic button endpoints
+    get "/emergency-contacts", EmergencyController, :index
+    post "/emergency-contacts", EmergencyController, :create
+    put "/emergency-contacts/:id", EmergencyController, :update
+    delete "/emergency-contacts/:id", EmergencyController, :delete
+    post "/emergency/panic", EmergencyController, :trigger_panic
+    get "/emergency/panic/status", EmergencyController, :get_panic_status
+    post "/emergency/panic/resolve", EmergencyController, :resolve_panic
+
+    # Emergency services locator endpoints
+    get "/emergency-services/nearby", EmergencyServicesController, :nearby
+    get "/emergency-services/police", EmergencyServicesController, :police_stations
+    get "/emergency-services/hospitals", EmergencyServicesController, :hospitals
   end
 
   # Premium-only endpoints
@@ -99,6 +113,8 @@ defmodule HotspotApiWeb.Router do
 
     # Travel Mode (Premium)
     post "/travel/analyze-route", TravelController, :analyze_route
+    post "/travel/alternative-routes", TravelController, :alternative_routes
+    post "/travel/realtime-updates", TravelController, :realtime_updates
   end
 
   # Webhook endpoint (no auth required)
@@ -155,6 +171,16 @@ defmodule HotspotApiWeb.Router do
     post "/subscriptions/initialize", SubscriptionsController, :initialize
     get "/subscriptions/status", SubscriptionsController, :status
     post "/subscriptions/cancel", SubscriptionsController, :cancel
+    get "/emergency-contacts", EmergencyController, :index
+    post "/emergency-contacts", EmergencyController, :create
+    put "/emergency-contacts/:id", EmergencyController, :update
+    delete "/emergency-contacts/:id", EmergencyController, :delete
+    post "/emergency/panic", EmergencyController, :trigger_panic
+    get "/emergency/panic/status", EmergencyController, :get_panic_status
+    post "/emergency/panic/resolve", EmergencyController, :resolve_panic
+    get "/emergency-services/nearby", EmergencyServicesController, :nearby
+    get "/emergency-services/police", EmergencyServicesController, :police_stations
+    get "/emergency-services/hospitals", EmergencyServicesController, :hospitals
   end
 
   # Premium-only endpoints (legacy)
@@ -162,6 +188,8 @@ defmodule HotspotApiWeb.Router do
     pipe_through [:api, :auth, :premium_required]
 
     post "/travel/analyze-route", TravelController, :analyze_route
+    post "/travel/alternative-routes", TravelController, :alternative_routes
+    post "/travel/realtime-updates", TravelController, :realtime_updates
   end
 
   # Webhook endpoint (no auth required)

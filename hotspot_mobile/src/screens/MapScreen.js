@@ -17,6 +17,7 @@ import websocketService from '../services/websocketService';
 import ReportIncidentModal from '../components/ReportIncidentModal';
 import HotspotZoneBanner from '../components/HotspotZoneBanner';
 import OfflineIndicator from '../components/OfflineIndicator';
+import EmergencyServicesModal from '../components/EmergencyServicesModal';
 import { useMarkerClustering, ClusterMarker } from '../components/MarkerCluster';
 import { MapMarkerSkeleton } from '../components/LoadingSkeleton';
 import { lightHaptic, warningHaptic, successHaptic } from '../utils/haptics';
@@ -64,6 +65,7 @@ const MapScreen = () => {
   const [verifiedIncidents, setVerifiedIncidents] = useState(new Set());
   const [zoneAlert, setZoneAlert] = useState(null);
   const [mapZoom, setMapZoom] = useState(12);
+  const [emergencyServicesModalVisible, setEmergencyServicesModalVisible] = useState(false);
   const mapRef = useRef(null);
   const locationWatchRef = useRef(null);
 
@@ -763,8 +765,27 @@ const MapScreen = () => {
               )}
             </TouchableOpacity>
           </View>
+
+          {/* Find Help Button */}
+          <TouchableOpacity
+            style={styles.findHelpButton}
+            onPress={() => {
+              lightHaptic();
+              setEmergencyServicesModalVisible(true);
+            }}
+          >
+            <Text style={styles.findHelpButtonText}>🚨 Find Help Nearby</Text>
+          </TouchableOpacity>
         </View>
       )}
+
+      {/* Emergency Services Modal */}
+      <EmergencyServicesModal
+        visible={emergencyServicesModalVisible}
+        onClose={() => setEmergencyServicesModalVisible(false)}
+        latitude={selectedIncident?.location?.latitude || userLocation?.latitude}
+        longitude={selectedIncident?.location?.longitude || userLocation?.longitude}
+      />
     </View>
   );
 };
@@ -1058,6 +1079,23 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  findHelpButton: {
+    backgroundColor: '#DC2626',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  findHelpButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
 

@@ -11,6 +11,9 @@ defmodule HotspotApi.Accounts.User do
     field :notification_config, :map, default: %{}
     field :premium_expires_at, :utc_datetime
 
+    has_many :emergency_contacts, HotspotApi.Accounts.EmergencyContact
+    has_many :panic_events, HotspotApi.Accounts.PanicEvent
+
     timestamps(type: :utc_datetime)
   end
 

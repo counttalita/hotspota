@@ -6,7 +6,7 @@ defmodule HotspotApi.Accounts do
   import Ecto.Query, warn: false
   alias HotspotApi.Repo
 
-  alias HotspotApi.Accounts.{User, OtpCode, AdminUser, AdminAuditLog}
+  alias HotspotApi.Accounts.{User, OtpCode, AdminUser, AdminAuditLog, EmergencyContact, PanicEvent}
 
   @doc """
   Returns the list of users.
@@ -360,6 +360,200 @@ defmodule HotspotApi.Accounts do
       _, query ->
         query
     end)
+  end
+
+  ## Emergency Contacts
+
+  @doc """
+  Lists all emergency contacts for a user.
+  """
+  def list_emergency_contacts(user_id) do
+    from(ec in EmergencyContact,
+      where: ec.user_id == ^user_id,
+      order_by: [asc: ec.priority]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single emergency contact.
+  """
+  def get_emergency_contact!(id), do: Repo.get!(EmergencyContact, id)
+
+  @doc """
+  Creates an emergency contact for a user.
+  Maximum 5 contacts per user.
+  """
+  def create_emergency_contact(user_id, attrs) do
+    # Check if user already has 5 contacts
+    contact_count = from(ec in EmergencyContact,
+      where: ec.user_id == ^user_id,
+      select: count(ec.id)
+    )
+    |> Repo.one()
+
+    if contact_count >= 5 do
+      {:error, :max_contacts_reached}
+    else
+      attrs = Map.put(attrs, :user_id, user_id)
+
+      %EmergencyContact{}
+      |> EmergencyContact.changeset(attrs)
+      |> Repo.insert()
+    end
+  end
+
+  @doc """
+  Updates an emergency contact.
+  """
+  def update_emergency_contact(%EmergencyContact{} = contact, attrs) do
+    contact
+    |> EmergencyContact.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes an emergency contact.
+  """
+  def delete_emergency_contact(%EmergencyContact{} = contact) do
+    Repo.delete(contact)
+  end
+
+  @doc """
+  Gets an emergency contact by ID and user ID (for authorization).
+  """
+  def get_user_emergency_contact(user_id, contact_id) do
+    from(ec in EmergencyContact,
+      where: ec.id == ^contact_id and ec.user_id == ^user_id
+    )
+    |> Repo.one()
+  end
+
+  ## Panic Events
+
+  @doc """
+  Creates a panic event and triggers emergency alerts.
+  """
+  def trigger_panic_button(user_id, latitude, longitude) do
+    user = get_user!(user_id) |> Repo.preload(:emergency_contacts)
+
+    # Create panic event
+    panic_attrs = %{
+      user_id: user_id,
+      latitude: latitude,
+      longitude: longitude,
+      status: "active"
+    }
+
+    case %PanicEvent{}
+         |> PanicEvent.changeset(panic_attrs)
+         |> Repo.insert() do
+      {:ok, panic_event} ->
+        # Send alerts to emergency contacts
+        send_emergency_alerts(user, panic_event)
+        {:ok, panic_event}
+
+      {:error, changeset} ->
+        {:error, changeset}
+    end
+  end
+
+  @doc """
+  Lists panic events for a user.
+  """
+  def list_panic_events(user_id) do
+    from(pe in PanicEvent,
+      where: pe.user_id == ^user_id,
+      order_by: [desc: pe.inserted_at]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single panic event.
+  """
+  def get_panic_event!(id), do: Repo.get!(PanicEvent, id)
+
+  @doc """
+  Resolves a panic event.
+  """
+  def resolve_panic_event(panic_event_id, notes \\ nil) do
+    panic_event = get_panic_event!(panic_event_id)
+
+    panic_event
+    |> PanicEvent.changeset(%{
+      status: "resolved",
+      resolved_at: DateTime.utc_now(),
+      notes: notes
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Cancels a panic event.
+  """
+  def cancel_panic_event(panic_event_id) do
+    panic_event = get_panic_event!(panic_event_id)
+
+    panic_event
+    |> PanicEvent.changeset(%{
+      status: "cancelled",
+      resolved_at: DateTime.utc_now()
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Gets the active panic event for a user, if any.
+  """
+  def get_active_panic_event(user_id) do
+    from(pe in PanicEvent,
+      where: pe.user_id == ^user_id and pe.status == "active",
+      order_by: [desc: pe.inserted_at],
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  defp send_emergency_alerts(user, panic_event) do
+    # Sort contacts by priority
+    contacts = Enum.sort_by(user.emergency_contacts, & &1.priority)
+
+    # Generate Google Maps link
+    maps_link = "https://www.google.com/maps?q=#{panic_event.latitude},#{panic_event.longitude}"
+
+    # Send SMS to each emergency contact
+    Enum.each(contacts, fn contact ->
+      message = """
+      🚨 EMERGENCY ALERT from #{user.phone_number}
+
+      They have activated their panic button and may need help!
+
+      Location: #{maps_link}
+
+      Time: #{Calendar.strftime(panic_event.inserted_at, "%Y-%m-%d %H:%M:%S UTC")}
+
+      This is an automated message from Hotspot Safety App.
+      """
+
+      # Send SMS via Twilio
+      twilio_client = Application.get_env(:hotspot_api, :twilio_client, HotspotApi.TwilioClient)
+      twilio_client.send_sms(contact.phone_number, message)
+
+      # Also send push notification if contact is a Hotspot user
+      case get_user_by_phone(contact.phone_number) do
+        nil -> :ok
+        contact_user ->
+          HotspotApi.Notifications.send_emergency_notification(
+            contact_user.id,
+            user.phone_number,
+            panic_event.latitude,
+            panic_event.longitude
+          )
+      end
+    end)
+
+    :ok
   end
 
 end
