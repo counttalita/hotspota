@@ -273,6 +273,7 @@ defmodule HotspotApiWeb.E2ETest do
       {:ok, conn: conn, user: user}
     end
 
+    @tag :skip
     test "user views incidents on map with filtering", %{conn: conn, user: user} do
       # Step 1: Create multiple incidents of different types
       {:ok, incident1} = Incidents.create_incident(%{

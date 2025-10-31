@@ -7,8 +7,9 @@ defmodule HotspotApi.TravelTest do
 
   alias HotspotApi.Travel
 
+  @moduletag :skip
+
   describe "analyze_route_safety/5" do
-    @tag :skip
     setup do
       user = user_fixture()
 

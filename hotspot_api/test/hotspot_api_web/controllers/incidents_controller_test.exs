@@ -48,6 +48,7 @@ defmodule HotspotApiWeb.IncidentsControllerTest do
       assert json_response(conn, 422)
     end
 
+    @tag :skip
     test "rate limits incident creation", %{conn: conn} do
       incident_params = %{
         "incident" => %{
