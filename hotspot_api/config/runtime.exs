@@ -61,6 +61,12 @@ if config_env() == :prod do
     security_alert_email: System.get_env("SECURITY_ALERT_EMAIL"),
     backup_encryption_key: System.get_env("BACKUP_ENCRYPTION_KEY")
 
+  # Paystack configuration
+  config :hotspot_api,
+    paystack_secret_key: System.get_env("PAYSTACK_SECRET_KEY"),
+    paystack_public_key: System.get_env("PAYSTACK_PUBLIC_KEY"),
+    paystack_callback_url: System.get_env("PAYSTACK_CALLBACK_URL") || "https://#{host}/payment/callback"
+
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
   # want to use a different value for prod and you most likely don't want

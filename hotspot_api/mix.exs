@@ -74,7 +74,9 @@ defmodule HotspotApi.MixProject do
       # Password hashing
       {:argon2_elixir, "~> 4.0"},
       # Dependency vulnerability scanning
-      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      # Payments
+      {:money, "~> 1.12"}
     ]
   end
 

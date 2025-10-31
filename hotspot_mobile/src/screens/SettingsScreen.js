@@ -12,7 +12,7 @@ import {
 import Slider from '@react-native-community/slider';
 import notificationService from '../services/notificationService';
 
-const SettingsScreen = () => {
+const SettingsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [preferences, setPreferences] = useState({
@@ -219,6 +219,15 @@ const SettingsScreen = () => {
             {preferences.is_premium ? '⭐ Premium' : 'Free'}
           </Text>
         </View>
+        
+        <TouchableOpacity
+          style={styles.manageSubscriptionButton}
+          onPress={() => navigation.navigate('Subscription')}
+        >
+          <Text style={styles.manageSubscriptionText}>
+            {preferences.is_premium ? 'Manage Subscription' : '⭐ Upgrade to Premium'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
@@ -358,6 +367,18 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 32,
+  },
+  manageSubscriptionButton: {
+    backgroundColor: '#F59E0B',
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  manageSubscriptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 

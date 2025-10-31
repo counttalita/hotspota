@@ -95,3 +95,9 @@ config :hotspot_api,
   abuseipdb_api_key: System.get_env("ABUSEIPDB_API_KEY"),
   # Security alert email
   security_alert_email: System.get_env("SECURITY_ALERT_EMAIL") || "security@hotspot.app"
+
+# Paystack configuration (use test keys in development)
+config :hotspot_api,
+  paystack_secret_key: System.get_env("PAYSTACK_SECRET_KEY") || "sk_test_your_test_secret_key",
+  paystack_public_key: System.get_env("PAYSTACK_PUBLIC_KEY") || "pk_test_your_test_public_key",
+  paystack_callback_url: System.get_env("PAYSTACK_CALLBACK_URL") || "http://localhost:3000/payment/callback"

@@ -110,6 +110,29 @@ defmodule HotspotApi.Accounts do
   end
 
   @doc """
+  Updates a user's premium status and expiration date.
+  """
+  def update_user_premium_status(user_id, is_premium, expires_at) do
+    user = get_user!(user_id)
+
+    attrs = %{
+      is_premium: is_premium,
+      premium_expires_at: expires_at
+    }
+
+    # Update alert radius based on premium status
+    attrs = if is_premium do
+      # Premium users can have up to 10km radius
+      Map.put(attrs, :alert_radius, min(user.alert_radius, 10000))
+    else
+      # Free users limited to 2km
+      Map.put(attrs, :alert_radius, min(user.alert_radius, 2000))
+    end
+
+    update_user(user, attrs)
+  end
+
+  @doc """
   Sends an OTP code to the given phone number via Twilio.
   Returns {:ok, otp_code} if successful, {:error, reason} otherwise.
   """

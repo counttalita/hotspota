@@ -66,6 +66,31 @@ defmodule HotspotApiWeb.Router do
     get "/analytics/time-patterns", AnalyticsController, :time_patterns
     get "/analytics/trends", AnalyticsController, :trends
     get "/analytics/summary", AnalyticsController, :summary
+
+    # Subscription endpoints
+    get "/subscriptions/plans", SubscriptionsController, :plans
+    post "/subscriptions/initialize", SubscriptionsController, :initialize
+    get "/subscriptions/status", SubscriptionsController, :status
+    post "/subscriptions/cancel", SubscriptionsController, :cancel
+  end
+
+  # Premium-only endpoints
+  pipeline :premium_required do
+    plug HotspotApiWeb.Plugs.PremiumRequired
+  end
+
+  scope "/api/v1", HotspotApiWeb do
+    pipe_through [:api_v1, :auth, :premium_required]
+
+    # Travel Mode (Premium)
+    post "/travel/analyze-route", TravelController, :analyze_route
+  end
+
+  # Webhook endpoint (no auth required)
+  scope "/api/v1", HotspotApiWeb do
+    pipe_through :api_v1
+
+    post "/subscriptions/webhook", SubscriptionsController, :webhook
   end
 
   scope "/api/v1", HotspotApiWeb do
@@ -108,6 +133,24 @@ defmodule HotspotApiWeb.Router do
     get "/analytics/time-patterns", AnalyticsController, :time_patterns
     get "/analytics/trends", AnalyticsController, :trends
     get "/analytics/summary", AnalyticsController, :summary
+    get "/subscriptions/plans", SubscriptionsController, :plans
+    post "/subscriptions/initialize", SubscriptionsController, :initialize
+    get "/subscriptions/status", SubscriptionsController, :status
+    post "/subscriptions/cancel", SubscriptionsController, :cancel
+  end
+
+  # Premium-only endpoints (legacy)
+  scope "/api", HotspotApiWeb do
+    pipe_through [:api, :auth, :premium_required]
+
+    post "/travel/analyze-route", TravelController, :analyze_route
+  end
+
+  # Webhook endpoint (no auth required)
+  scope "/api", HotspotApiWeb do
+    pipe_through :api
+
+    post "/subscriptions/webhook", SubscriptionsController, :webhook
   end
 
   scope "/api", HotspotApiWeb do
