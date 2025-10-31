@@ -212,6 +212,31 @@ defmodule HotspotApiWeb.Router do
     put "/users/:id/premium", UsersController, :update_premium
     post "/users/:id/notify", UsersController, :notify
     get "/users/:id/activity", UsersController, :activity
+
+    # Hotspot zone management endpoints
+    get "/zones", ZonesController, :index
+    get "/zones/:id", ZonesController, :show
+    post "/zones", ZonesController, :create
+    put "/zones/:id", ZonesController, :update
+    delete "/zones/:id", ZonesController, :delete
+    get "/zones/:id/incidents", ZonesController, :incidents
+    get "/zones/:id/stats", ZonesController, :stats
+
+    # Analytics endpoints
+    get "/analytics/trends", AnalyticsController, :trends
+    get "/analytics/heatmap", AnalyticsController, :heatmap
+    get "/analytics/peak-hours", AnalyticsController, :peak_hours
+    get "/analytics/users", AnalyticsController, :users
+    get "/analytics/revenue", AnalyticsController, :revenue
+    post "/analytics/export", AnalyticsController, :export
+
+    # Partner management endpoints
+    get "/partners", PartnersController, :index
+    get "/partners/:id", PartnersController, :show
+    post "/partners", PartnersController, :create
+    put "/partners/:id", PartnersController, :update
+    delete "/partners/:id", PartnersController, :delete
+    get "/partners/:id/stats", PartnersController, :stats
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

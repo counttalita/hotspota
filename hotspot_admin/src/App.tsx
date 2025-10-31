@@ -5,6 +5,9 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { IncidentsPage } from './pages/IncidentsPage'
 import { UsersPage } from './pages/UsersPage'
+import { ZonesPage } from './pages/ZonesPage'
+import { AnalyticsPage } from './pages/AnalyticsPage'
+import PartnersPage from './pages/PartnersPage'
 import { MainLayout } from './components/layout/MainLayout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
@@ -36,9 +39,9 @@ function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="incidents" element={<IncidentsPage />} />
             <Route path="users" element={<UsersPage />} />
-            <Route path="zones" element={<div>Zones Page (Coming Soon)</div>} />
-            <Route path="analytics" element={<div>Analytics Page (Coming Soon)</div>} />
-            <Route path="partners" element={<div>Partners Page (Coming Soon)</div>} />
+            <Route path="zones" element={<ZonesPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="partners" element={<PartnersPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
