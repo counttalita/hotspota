@@ -278,4 +278,32 @@ defmodule HotspotApi.Notifications do
 
   defp get_longitude(%Geo.Point{coordinates: {lng, _lat}}), do: to_string(lng)
   defp get_longitude(_), do: "0"
+
+  @doc """
+  Sends an admin notification to a specific user.
+  Used by admins to send custom notifications to users.
+  """
+  def send_admin_notification(user_id, title, message) do
+    # Get user's FCM tokens
+    tokens = get_user_tokens(user_id)
+
+    if length(tokens) > 0 do
+      # Send to all user's devices
+      Task.start(fn ->
+        Enum.each(tokens, fn fcm_token ->
+          data = %{
+            "type" => "admin_notification",
+            "title" => title,
+            "message" => message
+          }
+
+          send_fcm_or_apns(fcm_token.token, fcm_token.platform, title, message, data)
+        end)
+      end)
+
+      :ok
+    else
+      {:error, :no_tokens_found}
+    end
+  end
 end

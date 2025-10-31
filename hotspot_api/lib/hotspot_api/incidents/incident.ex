@@ -15,6 +15,8 @@ defmodule HotspotApi.Incidents.Incident do
     field :idempotency_key, :string
 
     belongs_to :user, HotspotApi.Accounts.User
+    has_many :verifications, HotspotApi.Incidents.IncidentVerification
+    has_many :flagged_content, HotspotApi.Moderation.FlaggedContent
 
     timestamps(type: :utc_datetime)
   end
