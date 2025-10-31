@@ -4,6 +4,7 @@ defmodule HotspotApiWeb.UserSocket do
   # Channels
   channel "incidents:*", HotspotApiWeb.IncidentChannel
   channel "geofence:*", HotspotApiWeb.GeofenceChannel
+  channel "community:*", HotspotApiWeb.CommunityChannel
 
   @impl true
   def connect(%{"token" => token}, socket, _connect_info) do

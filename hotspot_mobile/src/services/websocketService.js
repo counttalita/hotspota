@@ -8,12 +8,16 @@ class WebSocketService {
     this.socket = null;
     this.incidentChannel = null;
     this.geofenceChannel = null;
+    this.communityChannels = {}; // Map of groupId -> channel
     this.currentGeohash = null;
     this.userId = null;
     this.onIncidentCallbacks = [];
     this.onZoneEnteredCallbacks = [];
     this.onZoneExitedCallbacks = [];
     this.onZoneApproachingCallbacks = [];
+    this.onGroupIncidentCallbacks = {};
+    this.onMemberJoinedCallbacks = {};
+    this.onMemberLeftCallbacks = {};
   }
 
   /**
@@ -287,6 +291,162 @@ class WebSocketService {
   }
 
   /**
+   * Join community channel for a specific group
+   */
+  joinCommunityChannel(groupId) {
+    if (!this.socket) {
+      console.warn('Socket not connected');
+      return;
+    }
+
+    // Don't rejoin if already in channel
+    if (this.communityChannels[groupId]) {
+      return;
+    }
+
+    // Join community channel
+    const channel = this.socket.channel(`community:${groupId}`, {});
+
+    // Handle new incident in group
+    channel.on('incident:new', (data) => {
+      console.log('New group incident:', data);
+      this.notifyGroupIncidentCallbacks(groupId, data.incident);
+    });
+
+    // Handle member joined
+    channel.on('member:joined', (data) => {
+      console.log('Member joined group:', data);
+      this.notifyMemberJoinedCallbacks(groupId, data.member);
+    });
+
+    // Handle member left
+    channel.on('member:left', (data) => {
+      console.log('Member left group:', data);
+      this.notifyMemberLeftCallbacks(groupId, data.user_id);
+    });
+
+    channel
+      .join()
+      .receive('ok', () => {
+        console.log(`Joined community channel for group: ${groupId}`);
+        this.communityChannels[groupId] = channel;
+      })
+      .receive('error', (resp) => {
+        console.error('Failed to join community channel:', resp);
+      });
+  }
+
+  /**
+   * Leave community channel for a specific group
+   */
+  leaveCommunityChannel(groupId) {
+    const channel = this.communityChannels[groupId];
+    if (channel) {
+      channel.leave();
+      delete this.communityChannels[groupId];
+      delete this.onGroupIncidentCallbacks[groupId];
+      delete this.onMemberJoinedCallbacks[groupId];
+      delete this.onMemberLeftCallbacks[groupId];
+    }
+  }
+
+  /**
+   * Subscribe to new incidents in a group
+   */
+  onGroupIncident(groupId, callback) {
+    if (!this.onGroupIncidentCallbacks[groupId]) {
+      this.onGroupIncidentCallbacks[groupId] = [];
+    }
+    this.onGroupIncidentCallbacks[groupId].push(callback);
+
+    return () => {
+      if (this.onGroupIncidentCallbacks[groupId]) {
+        this.onGroupIncidentCallbacks[groupId] = this.onGroupIncidentCallbacks[groupId].filter(
+          (cb) => cb !== callback
+        );
+      }
+    };
+  }
+
+  /**
+   * Subscribe to member joined events in a group
+   */
+  onMemberJoined(groupId, callback) {
+    if (!this.onMemberJoinedCallbacks[groupId]) {
+      this.onMemberJoinedCallbacks[groupId] = [];
+    }
+    this.onMemberJoinedCallbacks[groupId].push(callback);
+
+    return () => {
+      if (this.onMemberJoinedCallbacks[groupId]) {
+        this.onMemberJoinedCallbacks[groupId] = this.onMemberJoinedCallbacks[groupId].filter(
+          (cb) => cb !== callback
+        );
+      }
+    };
+  }
+
+  /**
+   * Subscribe to member left events in a group
+   */
+  onMemberLeft(groupId, callback) {
+    if (!this.onMemberLeftCallbacks[groupId]) {
+      this.onMemberLeftCallbacks[groupId] = [];
+    }
+    this.onMemberLeftCallbacks[groupId].push(callback);
+
+    return () => {
+      if (this.onMemberLeftCallbacks[groupId]) {
+        this.onMemberLeftCallbacks[groupId] = this.onMemberLeftCallbacks[groupId].filter(
+          (cb) => cb !== callback
+        );
+      }
+    };
+  }
+
+  /**
+   * Notify callbacks about new group incident
+   */
+  notifyGroupIncidentCallbacks(groupId, incident) {
+    const callbacks = this.onGroupIncidentCallbacks[groupId] || [];
+    callbacks.forEach((callback) => {
+      try {
+        callback(incident);
+      } catch (error) {
+        console.error('Error in group incident callback:', error);
+      }
+    });
+  }
+
+  /**
+   * Notify callbacks about member joined
+   */
+  notifyMemberJoinedCallbacks(groupId, member) {
+    const callbacks = this.onMemberJoinedCallbacks[groupId] || [];
+    callbacks.forEach((callback) => {
+      try {
+        callback(member);
+      } catch (error) {
+        console.error('Error in member joined callback:', error);
+      }
+    });
+  }
+
+  /**
+   * Notify callbacks about member left
+   */
+  notifyMemberLeftCallbacks(groupId, userId) {
+    const callbacks = this.onMemberLeftCallbacks[groupId] || [];
+    callbacks.forEach((callback) => {
+      try {
+        callback(userId);
+      } catch (error) {
+        console.error('Error in member left callback:', error);
+      }
+    });
+  }
+
+  /**
    * Disconnect from WebSocket
    */
   disconnect() {
@@ -300,6 +460,11 @@ class WebSocketService {
       this.geofenceChannel = null;
     }
 
+    // Leave all community channels
+    Object.keys(this.communityChannels).forEach((groupId) => {
+      this.leaveCommunityChannel(groupId);
+    });
+
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -311,6 +476,9 @@ class WebSocketService {
     this.onZoneEnteredCallbacks = [];
     this.onZoneExitedCallbacks = [];
     this.onZoneApproachingCallbacks = [];
+    this.onGroupIncidentCallbacks = {};
+    this.onMemberJoinedCallbacks = {};
+    this.onMemberLeftCallbacks = {};
   }
 }
 

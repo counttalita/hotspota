@@ -101,6 +101,20 @@ defmodule HotspotApiWeb.Router do
     get "/emergency-services/nearby", EmergencyServicesController, :nearby
     get "/emergency-services/police", EmergencyServicesController, :police_stations
     get "/emergency-services/hospitals", EmergencyServicesController, :hospitals
+
+    # Community groups endpoints
+    get "/communities", CommunitiesController, :index
+    get "/communities/my-groups", CommunitiesController, :my_groups
+    get "/communities/:id", CommunitiesController, :show
+    post "/communities", CommunitiesController, :create
+    put "/communities/:id", CommunitiesController, :update
+    delete "/communities/:id", CommunitiesController, :delete
+    post "/communities/:id/join", CommunitiesController, :join
+    delete "/communities/:id/leave", CommunitiesController, :leave
+    get "/communities/:id/members", CommunitiesController, :members
+    put "/communities/:id/members/:user_id/role", CommunitiesController, :update_member_role
+    put "/communities/:id/notifications", CommunitiesController, :update_notifications
+    get "/communities/:id/incidents", CommunitiesController, :incidents
   end
 
   # Premium-only endpoints
@@ -181,6 +195,18 @@ defmodule HotspotApiWeb.Router do
     get "/emergency-services/nearby", EmergencyServicesController, :nearby
     get "/emergency-services/police", EmergencyServicesController, :police_stations
     get "/emergency-services/hospitals", EmergencyServicesController, :hospitals
+    get "/communities", CommunitiesController, :index
+    get "/communities/my-groups", CommunitiesController, :my_groups
+    get "/communities/:id", CommunitiesController, :show
+    post "/communities", CommunitiesController, :create
+    put "/communities/:id", CommunitiesController, :update
+    delete "/communities/:id", CommunitiesController, :delete
+    post "/communities/:id/join", CommunitiesController, :join
+    delete "/communities/:id/leave", CommunitiesController, :leave
+    get "/communities/:id/members", CommunitiesController, :members
+    put "/communities/:id/members/:user_id/role", CommunitiesController, :update_member_role
+    put "/communities/:id/notifications", CommunitiesController, :update_notifications
+    get "/communities/:id/incidents", CommunitiesController, :incidents
   end
 
   # Premium-only endpoints (legacy)
