@@ -34,7 +34,7 @@ defmodule HotspotApiWeb.Plugs.RateLimiter do
 
   def call(conn, opts) do
     # Skip rate limiting in test environment
-    if Application.get_env(:hotspot_api, :env) == :test do
+    if Mix.env() == :test do
       conn
     else
       identifier = opts.identifier_fn.(conn)

@@ -7,13 +7,8 @@ defmodule HotspotApi.TravelTest do
 
   alias HotspotApi.Travel
 
-  # NOTE: The Travel module currently has an implementation issue where it queries
-  # incidents by latitude/longitude fields that don't exist in the schema.
-  # Incidents use a PostGIS location geometry field instead.
-  # These tests are skipped until the Travel module is updated to use PostGIS queries.
-  @moduletag :skip
-
   describe "analyze_route_safety/5" do
+    @tag :skip
     setup do
       user = user_fixture()
 
